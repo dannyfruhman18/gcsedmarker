@@ -3,8 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? 'https://kgygnazvnvjgtypaokug.supabase.co'
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_kgUfyDJsTr7vt708X51uOA_XDV2ENU8'
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_kgUfyDJsTr7vt708X51uOA_XDV2ENU8'
 const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
 
 const BOARD_LINKS = {
@@ -290,32 +289,33 @@ function App() {
   return (
     <div className="app-shell">
       <header className="hero">
-        <div>
-          <p className="eyebrow">GCSEmarker</p>
-          <h1>Upload a question, choose the board, and get mark-style feedback fast.</h1>
+        <div className="hero-card">
+          <div className="brand-row">
+            <img src="/logo.svg" alt="GCSEmarker logo" className="brand-logo" />
+            <div>
+              <p className="eyebrow">GCSEmarker</p>
+              <h1>Upload a question, choose the board, and get mark-style feedback fast.</h1>
+            </div>
+          </div>
           <p className="lede">
             Built for essays, maths, and science. Includes AO1 / AO2 / AO3 prompts, method marks,
-            official mark-scheme links, a Top Band mode for grade 9 refinement, and subscription-ready
-            student access.
+            official mark-scheme links, a Top Band mode for grade 9 refinement, subscription-ready
+            access, and a Capacitor-ready path for iOS packaging.
           </p>
+          <div className="hero-actions">
+            <a className="chip-link" href={boardLink.href} target="_blank" rel="noreferrer">
+              {boardLink.label}
+            </a>
+            <a className="chip-link" href="https://capacitorjs.com/" target="_blank" rel="noreferrer">
+              Capacitor wrapper ready
+            </a>
+          </div>
         </div>
         <div className="hero-card">
-          <div className="stat">
-            <span>Exam board</span>
-            <strong>{board}</strong>
-          </div>
-          <div className="stat">
-            <span>Mode</span>
-            <strong>{modeOptions.find((item) => item.id === mode)?.label}</strong>
-          </div>
-          <div className="stat">
-            <span>Top Band</span>
-            <strong>{topBand ? 'On' : 'Off'}</strong>
-          </div>
-          <div className="stat">
-            <span>Subscription</span>
-            <strong>{subscriptionPlan}</strong>
-          </div>
+          <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
+          <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
+          <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
+          <div className="stat"><span>Subscription</span><strong>{subscriptionPlan}</strong></div>
         </div>
       </header>
 
@@ -335,9 +335,7 @@ function App() {
               Exam board
               <select value={board} onChange={(e) => setBoard(e.target.value)}>
                 {boardOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </label>
@@ -345,61 +343,34 @@ function App() {
               Mode
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
                 {modeOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
+                  <option key={item.id} value={item.id}>{item.label}</option>
                 ))}
               </select>
             </label>
             <label className="toggle">
-              <input
-                type="checkbox"
-                checked={topBand}
-                onChange={(e) => setTopBand(e.target.checked)}
-              />
+              <input type="checkbox" checked={topBand} onChange={(e) => setTopBand(e.target.checked)} />
               Top Band mode
             </label>
           </div>
 
           <div className="dropzone">
-            <input
-              id="upload"
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileChange(e.target.files?.[0])}
-            />
+            <input id="upload" type="file" accept="image/*" onChange={(e) => handleFileChange(e.target.files?.[0])} />
             <label htmlFor="upload">
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
             </label>
-            {uploadName ? (
-              <p className="file-name">Selected: {uploadName}</p>
-            ) : (
-              <p className="file-name">No file selected yet.</p>
-            )}
-            {uploadPreview ? (
-              <img className="preview" src={uploadPreview} alt="Uploaded question preview" />
-            ) : null}
+            {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
+            {uploadPreview ? <img className="preview" src={uploadPreview} alt="Uploaded question preview" /> : null}
           </div>
 
           <div className="textareas">
             <label>
               Question or prompt
-              <textarea
-                value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
-                placeholder="Paste the question text here."
-                rows={7}
-              />
+              <textarea value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Paste the question text here." rows={7} />
             </label>
             <label>
               Student answer / essay / working
-              <textarea
-                value={answerText}
-                onChange={(e) => setAnswerText(e.target.value)}
-                placeholder="Paste the answer, essay, or working here."
-                rows={10}
-              />
+              <textarea value={answerText} onChange={(e) => setAnswerText(e.target.value)} placeholder="Paste the answer, essay, or working here." rows={10} />
             </label>
           </div>
 
@@ -449,19 +420,9 @@ function App() {
 
           <div className="resource-box">
             <h3>Official mark-scheme links</h3>
-            <a href="https://www.aqa.org.uk/find-past-papers-and-mark-schemes" target="_blank" rel="noreferrer">
-              AQA
-            </a>
-            <a
-              href="https://qualifications.pearson.com/en/support/support-topics/exams/past-papers.html"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Pearson Edexcel
-            </a>
-            <a href="https://www.ocr.org.uk/qualifications/past-paper-finder/" target="_blank" rel="noreferrer">
-              OCR
-            </a>
+            <a href="https://www.aqa.org.uk/find-past-papers-and-mark-schemes" target="_blank" rel="noreferrer">AQA</a>
+            <a href="https://qualifications.pearson.com/en/support/support-topics/exams/past-papers.html" target="_blank" rel="noreferrer">Pearson Edexcel</a>
+            <a href="https://www.ocr.org.uk/qualifications/past-paper-finder/" target="_blank" rel="noreferrer">OCR</a>
           </div>
         </section>
       </main>
@@ -475,26 +436,17 @@ function App() {
           <div className="subscription-form">
             <label>
               Subscriber email
-              <input
-                type="email"
-                value={subscriptionEmail}
-                onChange={(e) => setSubscriptionEmail(e.target.value)}
-                placeholder="parent@example.com"
-              />
+              <input type="email" value={subscriptionEmail} onChange={(e) => setSubscriptionEmail(e.target.value)} placeholder="parent@example.com" />
             </label>
             <label>
               Plan
               <select value={subscriptionPlan} onChange={(e) => setSubscriptionPlan(e.target.value)}>
                 {subscriptionPlans.map((plan) => (
-                  <option key={plan.id} value={plan.id}>
-                    {plan.label} — {plan.price}
-                  </option>
+                  <option key={plan.id} value={plan.id}>{plan.label} — {plan.price}</option>
                 ))}
               </select>
             </label>
-            <p className="muted">
-              {subscriptionPlans.find((plan) => plan.id === subscriptionPlan)?.access}
-            </p>
+            <p className="muted">{subscriptionPlans.find((plan) => plan.id === subscriptionPlan)?.access}</p>
             <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
               {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? 'Open Stripe checkout' : 'Create subscription record'}
             </button>
@@ -542,9 +494,7 @@ function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent subscriptions</h2>
-          <button className="secondary" onClick={loadSubscriptions}>
-            Refresh
-          </button>
+          <button className="secondary" onClick={loadSubscriptions}>Refresh</button>
         </div>
         <div className="history-list">
           {recentSubscriptions.length ? (

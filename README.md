@@ -1,37 +1,29 @@
 # GCSEmarker
 
-GCSEmarker is a mobile-ready GCSE marking app with:
+GCSEmarker is a GCSE practice-marking app for uploaded question scans, exam-board-aware feedback, AO1/AO2/AO3 essay marking, maths/science method marks, official mark-scheme links, a Top Band mode, and subscription tracking.
 
-- image uploads / scan previews for questions
-- exam board selection: AQA, Edexcel, OCR
-- essay marking with AO1 / AO2 / AO3 feedback
-- maths and science marking with method-mark hints
-- official mark scheme links
-- Top Band mode for grade 9 improvement
-- subscription-ready checkout flow with Supabase-backed history
-- Capacitor wrapper config for mobile packaging
+## Stack
+- Vercel for hosting
+- GitHub for source control and GitHub Actions packaging
+- Supabase for persistence
+- Capacitor for iOS wrapper packaging
 
-## Local development
-
+## Local setup
 ```bash
 npm install
 npm run dev
 ```
 
 ## Build
-
 ```bash
 npm run build
 ```
 
-## Capacitor wrapper
-
+## iOS wrapper sync
 ```bash
 npm run cap:sync
 ```
 
-## Environment variables
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_STRIPE_PAYMENT_LINK`
+## Supabase tables
+- `marking_sessions`
+- `subscriptions`
