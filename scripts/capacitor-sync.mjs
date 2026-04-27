@@ -13,7 +13,7 @@ await mkdir(iosPublicDir, { recursive: true })
 await cp(distDir, iosPublicDir, { recursive: true })
 await writeFile(
   path.resolve('ios/App/capacitor-sync.txt'),
-  'Capacitor sync placeholder: web build copied to ios/App/public for wrapper packaging.\n'
+  'Capacitor sync complete: web build copied to ios/App/public.\n'
 )
 
 console.log('Capacitor sync complete')

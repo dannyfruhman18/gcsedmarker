@@ -1,28 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createClient } from '@supabase/supabase-js'
-import Tesseract from 'tesseract.js'
+import { createWorker } from 'tesseract.js'
 import './styles.css'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? 'https://kgygnazvnvjgtypaokug.supabase.co'
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_OXGxr2KQxcuNgrVs_UQrCw_dX8O72XM'
 const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-})
-
 const BOARD_LINKS = {
   AQA: {
-    label: 'AQA mark schemes',
+    label: 'AQA past papers and mark schemes',
     href: 'https://www.aqa.org.uk/find-past-papers-and-mark-schemes',
   },
   Edexcel: {
-    label: 'Pearson Edexcel mark schemes',
+    label: 'Pearson Edexcel past papers and mark schemes',
     href: 'https://qualifications.pearson.com/en/support/support-topics/exams/past-papers.html',
   },
   OCR: {
@@ -43,6 +34,39 @@ const subscriptionPlans = [
   { id: 'school', label: 'School', price: 'Custom', access: 'Multi-seat access + shared reporting' },
 ]
 
+function safeParseJson(text) {
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+async function supabaseRequest(path, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  })
+
+  const text = await response.text()
+  const data = safeParseJson(text)
+
+  if (!response.ok) {
+    const message = typeof data === 'string'
+      ? data
+      : data?.message || data?.error_description || data?.hint || response.statusText
+    throw new Error(`${message} (${response.status})`)
+  }
+
+  return data
+}
+
 function scoreEssay(answer, topBand) {
   const text = answer.trim()
   const length = text.split(/\s+/).filter(Boolean).length
@@ -51,27 +75,13 @@ function scoreEssay(answer, topBand) {
   const ao3 = []
   let score = 0
 
-  if (!text) {
-    ao1.push('No answer entered yet — add factual detail and examples.')
-    ao2.push('Explain how the evidence matters.')
-    ao3.push('Add a clear judgement or comparison to reach stronger AO3 levels.')
-    return {
-      maxMarks: topBand ? 4 : 3,
-      score: 0,
-      ao1,
-      ao2,
-      ao3,
-      summary: topBand
-        ? 'Grade 9 / Top Band focus: make every paragraph precise, conceptual, and evaluative.'
-        : 'Focus on specific knowledge, explanation, and a clear conclusion.',
-    }
-  }
-
   if (length >= 80) {
     ao1.push('Clear subject knowledge shown with enough developed detail to reward.')
     score += 1
-  } else {
+  } else if (length > 0) {
     ao1.push('Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
+  } else {
+    ao1.push('No answer entered yet — add factual detail and examples.')
   }
 
   if (/\b(because|therefore|this shows|consequently|as a result|proves|suggests)\b/i.test(text)) {
@@ -82,7 +92,7 @@ function scoreEssay(answer, topBand) {
   }
 
   if (/\b(however|although|overall|on the other hand|ultimately|to a large extent|judgement)\b/i.test(text)) {
-    ao3.push('There is some evaluation / judgement, which helps the top bands.')
+    ao3.push('There is some evaluation or judgement, which helps the top bands.')
     score += 1
   } else {
     ao3.push('Add a clear judgement or comparison to reach stronger AO3 levels.')
@@ -106,82 +116,72 @@ function scoreEssay(answer, topBand) {
   }
 }
 
-function scoreMathsScience(question, answer, topBand) {
-  const q = question.trim()
-  const a = answer.trim()
-  const lines = a.split(/\n+/).map((line) => line.trim()).filter(Boolean)
-  const hasSteps = lines.length >= 2
-  const hasEquation = /\d+\s*[+\-*/×÷=]\s*\d+/.test(a) || /\b[a-zA-Z]+\s*=\s*\d/.test(a)
-  const hasMethodWords = /\b(substitute|calculate|expand|factorise|simplify|solve|arrange|rearrange|formula|working)\b/i.test(a)
-  const hasUnits = /\b(cm|mm|m|km|kg|g|N|J|W|s|ms|°C|mol|dm3|cm3)\b/i.test(a)
-  const hasConclusion = /\b(therefore|so|hence|thus|final answer|answer is|in conclusion)\b/i.test(a)
-  const hasCheck = /\b(check|verify|sanity|reasonable)\b/i.test(a)
+function scoreMathsScience(answer, topBand) {
+  const text = answer.trim()
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
+  const methodMarks = []
+  const marks = new Set()
 
-  const extra = []
-  let score = 0
-
-  if (!a) {
-    extra.push('Enter your working or answer to get method-mark feedback.')
-    return {
-      maxMarks: topBand ? 5 : 4,
-      score: 0,
-      ao1: ['Method marks are awarded for the steps, working, and correct structure you show.'],
-      ao2: ['Explain each step clearly, especially when moving from formula to substitution to answer.'],
-      ao3: ['If this is a science question, include the key scientific idea, correct units, and any required conclusion.'],
-      summary: topBand
-        ? 'Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.'
-        : 'Method marks focus on visible working and correct process.',
-      extra,
-    }
-  }
-
-  if (hasSteps) {
-    score += 1
-    extra.push('You show more than one line of working, which is good evidence for method marks.')
+  if (lines.length >= 2) {
+    marks.add('working')
+    methodMarks.push('You show more than one line of working, which is good evidence for method marks.')
+  } else if (text) {
+    methodMarks.push('Show the steps you used, not just the final answer.')
   } else {
-    extra.push('Show the steps you used, not just the final answer.')
+    methodMarks.push('Enter your working or answer to get method-mark feedback.')
   }
 
-  if (hasEquation || hasMethodWords) {
-    score += 1
-    extra.push('Your response includes a recognisable calculation method or working language.')
+  if (/=|→|=>|\bsubstitut(e|ion)\b|\bcalculate\b|\bshow\b/i.test(text)) {
+    marks.add('process')
+    methodMarks.push('Your response includes process language or a clear calculation trail.')
   } else {
-    extra.push('Use equations, substitutions, or method language to earn method marks.')
+    methodMarks.push('Use equations, substitutions, or calculation steps to earn method marks.')
   }
 
-  if (hasUnits) {
-    score += 1
-    extra.push('You are including units, which helps a science or maths response look complete.')
+  if (/\b(cm|mm|m|kg|g|n|j|w|s|°c|mol|dm\^?3)\b/i.test(text)) {
+    marks.add('units')
+    methodMarks.push('You have included units or scientific measurement language.')
   } else {
-    extra.push('Include units where relevant to secure the final mark.')
+    methodMarks.push('Include units where needed and keep the final answer contextualised.')
   }
 
-  if (hasConclusion) {
-    score += 1
-    extra.push('You are moving from working to a conclusion, which helps the final-mark award.')
-  } else {
-    extra.push('Finish with a clear final answer statement.')
+  if (/\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)) {
+    marks.add('conclusion')
+    methodMarks.push('You are moving from working to a conclusion, which helps the final-mark award.')
   }
 
-  if (topBand) {
-    if (hasCheck || /\b(reasonable|estimate|compare)\b/i.test(q + ' ' + a)) {
-      score += 1
-      extra.push('Top Band mode: you have a checking / evaluation step as well.')
-    } else {
-      extra.push('Top Band mode: check the answer against a sensible estimate or expected pattern.')
-    }
+  if (topBand && text.length >= 100) {
+    marks.add('topband')
+    methodMarks.push('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
   }
+
+  const score = Math.min(marks.size + (topBand && text.length >= 100 ? 1 : 0), topBand ? 5 : 4)
 
   return {
     maxMarks: topBand ? 5 : 4,
-    score: Math.min(score, topBand ? 5 : 4),
+    score,
     ao1: ['Method marks are awarded for the steps, working, and correct structure you show.'],
     ao2: ['Explain each step clearly, especially when moving from formula to substitution to answer.'],
     ao3: ['If this is a science question, include the key scientific idea, correct units, and any required conclusion.'],
     summary: topBand
       ? 'Top Band mode: maximise the working trail and annotate every step.'
       : 'Method marks focus on visible working and correct process.',
-    extra,
+    extra: methodMarks,
+  }
+}
+
+async function extractQuestionTextFromImage(file, onProgress) {
+  const worker = await createWorker('eng', 1, {
+    logger: (message) => {
+      if (message?.status) onProgress?.(`OCR: ${message.status}`)
+    },
+  })
+
+  try {
+    const result = await worker.recognize(file)
+    return result?.data?.text?.trim() ?? ''
+  } finally {
+    await worker.terminate()
   }
 }
 
@@ -193,8 +193,7 @@ function App() {
   const [answerText, setAnswerText] = useState('')
   const [uploadName, setUploadName] = useState('')
   const [uploadPreview, setUploadPreview] = useState('')
-  const [ocrStatus, setOcrStatus] = useState('')
-  const [ocrError, setOcrError] = useState('')
+  const [ocrStatus, setOcrStatus] = useState('Upload an image and OCR will fill the question box.')
   const [markResult, setMarkResult] = useState(null)
   const [recentSessions, setRecentSessions] = useState([])
   const [recentSubscriptions, setRecentSubscriptions] = useState([])
@@ -204,130 +203,103 @@ function App() {
   const [subscriptionPlan, setSubscriptionPlan] = useState('top-band')
   const [subscriptionResult, setSubscriptionResult] = useState('')
   const [submittingSubscription, setSubmittingSubscription] = useState(false)
-  const [authEmail, setAuthEmail] = useState('')
-  const [authMessage, setAuthMessage] = useState('')
-  const [authError, setAuthError] = useState('')
-  const [session, setSession] = useState(null)
-  const [authBusy, setAuthBusy] = useState(false)
+
   const boardLink = useMemo(() => BOARD_LINKS[board], [board])
-
-  useEffect(() => {
-    let active = true
-
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!active) return
-      if (error) setAuthError(error.message)
-      setSession(data.session ?? null)
-      setAuthEmail(data.session?.user?.email ?? '')
+  const activeSubscription = useMemo(() => {
+    const email = subscriptionEmail.trim().toLowerCase()
+    if (!email) return false
+    return recentSubscriptions.some((row) => {
+      return String(row.email || '').toLowerCase() === email && String(row.status || '').toLowerCase() === 'active'
     })
-
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      setAuthEmail(nextSession?.user?.email ?? '')
-    })
-
-    return () => {
-      active = false
-      data.subscription.unsubscribe()
-    }
-  }, [])
+  }, [recentSubscriptions, subscriptionEmail])
 
   useEffect(() => {
     void loadSessions()
     void loadSubscriptions()
-  }, [session])
+  }, [])
 
   async function loadSessions() {
-    if (!session?.user?.id) {
-      setRecentSessions([])
-      return
-    }
     setLoadingSessions(true)
     try {
-      const { data, error } = await supabase
-        .from('marking_sessions')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      if (error) throw error
-      setRecentSessions(data ?? [])
+      const rows = await supabaseRequest('/rest/v1/marking_sessions?select=*&order=created_at.desc&limit=5', {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      })
+      setRecentSessions(rows ?? [])
     } catch (error) {
       console.error(error)
-      setAuthError(`Supabase load failed: ${error?.message || String(error)}`)
     } finally {
       setLoadingSessions(false)
     }
   }
 
   async function loadSubscriptions() {
-    if (!session?.user?.id) {
-      setRecentSubscriptions([])
-      return
-    }
     try {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      if (error) throw error
-      setRecentSubscriptions(data ?? [])
+      const rows = await supabaseRequest('/rest/v1/subscriptions?select=*&order=created_at.desc&limit=5', {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      })
+      setRecentSubscriptions(rows ?? [])
     } catch (error) {
       console.error(error)
-      setAuthError(`Subscription load failed: ${error?.message || String(error)}`)
     }
   }
 
   async function handleFileChange(file) {
     if (!file) return
     setUploadName(file.name)
-    setOcrError('')
-    setOcrStatus('Reading image...')
     if (uploadPreview) URL.revokeObjectURL(uploadPreview)
     setUploadPreview(URL.createObjectURL(file))
+    setOcrStatus('Reading text from the image...')
 
     try {
-      const result = await Tesseract.recognize(file, 'eng')
-      const text = result?.data?.text?.trim() ?? ''
-      if (text) {
-        setQuestionText((current) => (current.trim() ? current : text))
-        setOcrStatus('OCR text extracted from the upload.')
+      const extracted = await extractQuestionTextFromImage(file, setOcrStatus)
+      if (extracted) {
+        setQuestionText(extracted)
+        setOcrStatus(`Text read from image (${extracted.split(/\s+/).filter(Boolean).length} words).`)
       } else {
-        setOcrStatus('No readable text found in the image yet.')
+        setOcrStatus('No clear text found. You can type or paste the question manually.')
       }
     } catch (error) {
-      setOcrError(`OCR failed: ${error?.message || String(error)}`)
-      setOcrStatus('')
+      console.error(error)
+      setOcrStatus('OCR failed — please type the question manually.')
     }
   }
 
   async function handleMark() {
-    if (!session?.user?.id) {
-      setAuthMessage('Please sign in first so GCSEmarker can save your work securely.')
+    if (STRIPE_PAYMENT_LINK && !activeSubscription) {
+      setMarkResult({
+        score: 0,
+        maxMarks: topBand ? 5 : 4,
+        summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for the active record before marking.',
+        ao1: ['This workspace is currently configured to require an active subscription before marking.'],
+        ao2: [],
+        ao3: [],
+      })
       return
     }
 
     const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
-    const result = analyzer(questionText, answerText, topBand)
+    const result = analyzer(mode === 'essay' ? answerText : answerText, topBand)
     setMarkResult(result)
     setSaving(true)
 
     try {
-      const { error } = await supabase.from('marking_sessions').insert({
-        user_id: session.user.id,
-        exam_board: board,
-        mode,
-        question_text: questionText,
-        answer_text: answerText,
-        upload_name: uploadName,
-        score: result.score,
-        feedback: result,
+      await supabaseRequest('/rest/v1/marking_sessions', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify([
+          {
+            exam_board: board,
+            mode,
+            question_text: questionText,
+            answer_text: answerText,
+            upload_name: uploadName,
+            score: result.score,
+            feedback: result,
+          },
+        ]),
       })
-      if (error) throw error
       await loadSessions()
     } catch (error) {
       setMarkResult((current) => ({
@@ -339,56 +311,10 @@ function App() {
     }
   }
 
-  async function handleSendMagicLink() {
-    const email = authEmail.trim()
-    if (!email) {
-      setAuthError('Enter an email address first.')
-      return
-    }
-    setAuthBusy(true)
-    setAuthError('')
-    setAuthMessage('')
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: window.location.origin,
-        },
-      })
-      if (error) throw error
-      setAuthMessage('Check your email for the sign-in link.')
-    } catch (error) {
-      setAuthError(`Sign-in failed: ${error?.message || String(error)}`)
-    } finally {
-      setAuthBusy(false)
-    }
-  }
-
-  async function handleSignOut() {
-    setAuthBusy(true)
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      setSession(null)
-      setRecentSessions([])
-      setRecentSubscriptions([])
-      setAuthMessage('Signed out.')
-    } catch (error) {
-      setAuthError(`Sign-out failed: ${error?.message || String(error)}`)
-    } finally {
-      setAuthBusy(false)
-    }
-  }
-
   async function handleSubscription() {
     const email = subscriptionEmail.trim()
     if (!email) {
       setSubscriptionResult('Add an email address first.')
-      return
-    }
-
-    if (!session?.user?.id) {
-      setSubscriptionResult('Sign in first so the subscription can be saved to your account.')
       return
     }
 
@@ -398,19 +324,22 @@ function App() {
         window.open(STRIPE_PAYMENT_LINK, '_blank', 'noreferrer')
       }
 
-      const { error } = await supabase.from('subscriptions').insert({
-        user_id: session.user.id,
-        email,
-        plan: subscriptionPlan,
-        status: STRIPE_PAYMENT_LINK ? 'checkout_opened' : 'active',
-        provider: STRIPE_PAYMENT_LINK ? 'stripe_link' : 'supabase_demo',
-        notes: STRIPE_PAYMENT_LINK ? 'User sent to Stripe checkout link.' : 'No Stripe link configured yet.',
+      await supabaseRequest('/rest/v1/subscriptions', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify([
+          {
+            email,
+            plan: subscriptionPlan,
+            status: STRIPE_PAYMENT_LINK ? 'pending_payment' : 'active',
+            provider: STRIPE_PAYMENT_LINK ? 'stripe_link' : 'supabase_demo',
+            notes: STRIPE_PAYMENT_LINK ? 'User sent to Stripe checkout link.' : 'No Stripe link configured yet.',
+          },
+        ]),
       })
-      if (error) throw error
-
       setSubscriptionResult(
         STRIPE_PAYMENT_LINK
-          ? 'Stripe checkout opened and subscription record saved in Supabase.'
+          ? 'Stripe checkout opened and subscription record saved in Supabase as pending_payment.'
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.'
       )
       await loadSubscriptions()
@@ -424,31 +353,35 @@ function App() {
   return (
     <div className="app-shell">
       <header className="hero">
-        <div className="brand-row">
-          <img src="/logo.svg" alt="GCSEmarker logo" className="brand-logo" />
-          <div>
-            <p className="eyebrow">GCSEmarker</p>
-            <h1>Upload a question, choose the board, and get mark-style feedback fast.</h1>
+        <div className="hero-card">
+          <div className="brand-row">
+            <img src="/logo.svg" alt="GCSEmarker logo" className="brand-logo" />
+            <div>
+              <p className="eyebrow">GCSEmarker</p>
+              <h1>Upload a question, choose the board, and get mark-style feedback fast.</h1>
+            </div>
+          </div>
+          <p className="lede">
+            Built for essays, maths, and science. Includes OCR image reading, AO1 / AO2 / AO3 prompts, method marks,
+            official mark-scheme links, a Top Band mode for grade 9 refinement, subscription-ready
+            access, and a Capacitor-ready path for iOS packaging.
+          </p>
+          <div className="hero-actions">
+            <a className="chip-link" href={boardLink.href} target="_blank" rel="noreferrer">
+              {boardLink.label}
+            </a>
+            <a className="chip-link" href="https://capacitorjs.com/" target="_blank" rel="noreferrer">
+              Capacitor wrapper ready
+            </a>
           </div>
         </div>
-        <p className="lede">
-          Built for essays, maths, and science. Includes AO1 / AO2 / AO3 prompts, method marks,
-          official mark-scheme links, a Top Band mode for grade 9 refinement, subscription-ready
-          access, real OCR on uploads, and a Capacitor-ready path for iOS packaging.
-        </p>
-        <div className="hero-actions">
-          <a className="chip-link" href={boardLink.href} target="_blank" rel="noreferrer">
-            {boardLink.label}
-          </a>
-          <a className="chip-link" href="https://capacitorjs.com/" target="_blank" rel="noreferrer">
-            Capacitor wrapper ready
-          </a>
-        </div>
-        <div className="stat-row">
-          <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
-          <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
-          <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
-          <div className="stat"><span>Auth</span><strong>{session?.user?.email ? 'Signed in' : 'Waiting'}</strong></div>
+        <div className="hero-card">
+          <div className="stat-row">
+            <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
+            <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
+            <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
+            <div className="stat"><span>Paywall</span><strong>{STRIPE_PAYMENT_LINK ? 'On' : 'Demo'}</strong></div>
+          </div>
         </div>
       </header>
 
@@ -487,21 +420,20 @@ function App() {
           </div>
 
           <div className="dropzone">
-            <input id="upload" type="file" accept="image/*" onChange={(e) => handleFileChange(e.target.files?.[0])} />
+            <input id="upload" type="file" accept="image/*" onChange={(e) => void handleFileChange(e.target.files?.[0])} />
             <label htmlFor="upload">
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
             </label>
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
-            {ocrStatus ? <p className="file-name">{ocrStatus}</p> : null}
-            {ocrError ? <p className="error">{ocrError}</p> : null}
+            <p className="muted">{ocrStatus}</p>
             {uploadPreview ? <img className="preview" src={uploadPreview} alt="Uploaded question preview" /> : null}
           </div>
 
           <div className="textareas">
             <label>
               Question or prompt
-              <textarea value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Paste the question text here or let OCR fill it in." rows={7} />
+              <textarea value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Paste the question text here." rows={7} />
             </label>
             <label>
               Student answer / essay / working
@@ -510,15 +442,12 @@ function App() {
           </div>
 
           <button className="primary" onClick={handleMark} disabled={saving}>
-            {saving ? 'Saving...' : session?.user?.id ? 'Mark answer' : 'Sign in to save and mark'}
+            {saving ? 'Saving...' : 'Mark answer'}
           </button>
         </section>
 
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Feedback</h2>
-            <span className="muted">AO1 / AO2 / AO3 + method marks</span>
-          </div>
+        <section className="panel results-panel">
+          <h2>Feedback</h2>
           {markResult ? (
             <div className="result-card">
               <div className="result-score">
@@ -567,28 +496,14 @@ function App() {
 
       <section className="panel subscription-panel">
         <div className="panel-header">
-          <h2>Account and subscription</h2>
-          <span className="muted">Supabase auth + Stripe-ready flow</span>
+          <h2>Subscription service</h2>
+          <span className="muted">Stripe-ready, with Supabase storage</span>
         </div>
         <div className="subscription-grid">
           <div className="subscription-form">
             <label>
-              Email for sign in / subscription
-              <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="parent@example.com" />
-            </label>
-            <div className="hero-actions">
-              <button className="secondary" onClick={handleSendMagicLink} disabled={authBusy}>
-                {authBusy ? 'Sending...' : 'Send magic link'}
-              </button>
-              <button className="secondary" onClick={handleSignOut} disabled={authBusy || !session}>
-                Sign out
-              </button>
-            </div>
-            {authMessage ? <p className="result-note">{authMessage}</p> : null}
-            {authError ? <p className="error">{authError}</p> : null}
-            <label>
               Subscriber email
-              <input type="email" value={subscriptionEmail} onChange={(e) => setSubscriptionEmail(e.target.value)} placeholder="subscriber@example.com" />
+              <input type="email" value={subscriptionEmail} onChange={(e) => setSubscriptionEmail(e.target.value)} placeholder="parent@example.com" />
             </label>
             <label>
               Plan
@@ -599,8 +514,8 @@ function App() {
               </select>
             </label>
             <p className="muted">{subscriptionPlans.find((plan) => plan.id === subscriptionPlan)?.access}</p>
-            <button className="primary" onClick={handleSubscription} disabled={submittingSubscription || !session}>
-              {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? 'Open Stripe checkout' : 'Save subscription'}
+            <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
+              {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? 'Open Stripe checkout' : 'Create subscription record'}
             </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
           </div>
@@ -619,26 +534,26 @@ function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent Supabase saves</h2>
-          <button className="secondary" onClick={loadSessions} disabled={loadingSessions || !session}>
+          <button className="secondary" onClick={loadSessions} disabled={loadingSessions}>
             {loadingSessions ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
         <div className="history-list">
           {recentSessions.length ? (
-            recentSessions.map((sessionRow) => (
-              <article key={sessionRow.id} className="history-item">
+            recentSessions.map((session) => (
+              <article key={session.id} className="history-item">
                 <div>
-                  <strong>{sessionRow.exam_board}</strong>
-                  <span>{sessionRow.mode}</span>
+                  <strong>{session.exam_board}</strong>
+                  <span>{session.mode}</span>
                 </div>
                 <div>
-                  <strong>{sessionRow.score ?? 0}</strong>
-                  <span>{new Date(sessionRow.created_at).toLocaleString()}</span>
+                  <strong>{session.score ?? 0}</strong>
+                  <span>{new Date(session.created_at).toLocaleString()}</span>
                 </div>
               </article>
             ))
           ) : (
-            <p className="muted">No saved sessions yet. Sign in and mark something to populate this list.</p>
+            <p className="muted">No saved sessions yet. Mark something and it will appear here.</p>
           )}
         </div>
       </section>
@@ -646,9 +561,7 @@ function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent subscriptions</h2>
-          <button className="secondary" onClick={loadSubscriptions} disabled={!session}>
-            Refresh
-          </button>
+          <button className="secondary" onClick={loadSubscriptions}>Refresh</button>
         </div>
         <div className="history-list">
           {recentSubscriptions.length ? (
@@ -665,7 +578,7 @@ function App() {
               </article>
             ))
           ) : (
-            <p className="muted">No subscriptions saved yet. Sign in and add one to populate this list.</p>
+            <p className="muted">No subscriptions saved yet. Create one and it will appear here.</p>
           )}
         </div>
       </section>
