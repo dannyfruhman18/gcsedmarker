@@ -312,14 +312,16 @@ function App() {
           </div>
         </div>
         <div className="hero-card">
-          <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
-          <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
-          <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
-          <div className="stat"><span>Subscription</span><strong>{subscriptionPlan}</strong></div>
+          <div className="stat-row">
+            <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
+            <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
+            <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
+            <div className="stat"><span>Subscription</span><strong>{subscriptionPlan}</strong></div>
+          </div>
         </div>
       </header>
 
-      <main className="grid">
+      <main className="chat-layout">
         <section className="panel">
           <div className="panel-header">
             <h2>Mark a GCSE answer</h2>
