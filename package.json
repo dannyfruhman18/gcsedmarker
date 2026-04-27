@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "GCSEmarker app for exam-board-aware marking, Top Band feedback, and subscription access.",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,7 +11,6 @@
     "cap:sync": "node scripts/capacitor-sync.mjs"
   },
   "dependencies": {
-    "@capacitor/cli": "^6.1.2",
     "@capacitor/core": "^6.1.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

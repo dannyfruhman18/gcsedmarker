@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
+import { performOcr } from './ocr.js'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? 'https://kgygnazvnvjgtypaokug.supabase.co'
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_kgUfyDJsTr7vt708X51uOA_XDV2ENU8'
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_OXGxr2KQxcuNgrVs_UQrCw_dX8O72XM'
 const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
 
 const BOARD_LINKS = {
@@ -65,7 +67,9 @@ function scoreEssay(answer, topBand) {
   }
 
   if (topBand) {
-    ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
+    ao3.push(
+      'Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.'
+    )
     ao2.push('Top Band mode: use linked chains of reasoning and compare alternatives instead of listing points.')
     if (length >= 140) score += 1
   }
@@ -83,50 +87,53 @@ function scoreEssay(answer, topBand) {
 }
 
 function scoreMathsScience(question, answer, topBand) {
-  const q = `${question}\n${answer}`
-  const lines = answer.split(/\n+/).map((line) => line.trim()).filter(Boolean)
-  const workingSignals = [
-    /\d+\s*[+\-*/×÷=]\s*\d+/, /substitute/i, /therefore/i, /so/i, /because/i, /units?/i,
-    /cm\b|mm\b|m\b|kg\b|g\b|N\b|J\b|W\b|s\b|°C\b|mol\b|dm\^?3\b/i,
-    /show/i, /calculate/i, /method/i, /equation/i,
-  ]
+  const text = answer.trim()
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
+  const hasMathsWorking = /(?:=|\+|\-|\*|\/|×|÷)/.test(text)
+  const hasWorkingWords = /\b(?:substitute|therefore|because|method|calculate|equation|solve|show|step|working)\b/i.test(
+    text
+  )
+  const hasUnits = /\b(?:cm|mm|m|km|kg|g|mg|N|J|W|s|°C|mol|dm\^?3|L|ml|A|V|Ω|Hz)\b/i.test(text)
+  const hasConclusion = /\b(?:therefore|so|answer|final|there is|gives)\b/i.test(text)
+
   let methodMarks = 0
   const feedback = []
 
-  if (lines.length >= 2) {
-    methodMarks += 1
-    feedback.push('You show more than one line of working, which is good evidence for method marks.')
-  } else if (answer.trim()) {
-    feedback.push('Show the steps you used, not just the final answer.')
-  } else {
+  if (!text) {
     feedback.push('Enter your working or answer to get method-mark feedback.')
-  }
-
-  if (workingSignals.some((re) => re.test(q))) {
-    methodMarks += 1
-    feedback.push('Your response includes mathematical / scientific working language or structure.')
   } else {
-    feedback.push('Use equations, substitutions, units, or scientific terminology to earn method marks.')
-  }
+    if (lines.length >= 2) {
+      methodMarks += 1
+      feedback.push('You show more than one step of working, which is good evidence for method marks.')
+    } else {
+      feedback.push('Add a visible step-by-step method, not just one line.')
+    }
 
-  if (/=/.test(answer) || /→|=>/.test(answer)) {
-    methodMarks += 1
-    feedback.push('You are moving from working to a conclusion, which helps the final-mark award.')
-  }
+    if (hasMathsWorking && hasWorkingWords) {
+      methodMarks += 1
+      feedback.push('Your working includes equations, substitutions, or method language.')
+    } else {
+      feedback.push('Use equations, substitutions, or method language to earn method marks.')
+    }
 
-  if (/unit/i.test(answer) || /[a-zA-Z]$/m.test(answer)) {
-    methodMarks += 1
-    feedback.push('You are attempting to include a final answer with context or units.')
-  }
+    if (hasConclusion || hasUnits) {
+      methodMarks += 1
+      feedback.push('You move from working to a conclusion and include units or context.')
+    } else {
+      feedback.push('Finish with a clear conclusion and units if needed.')
+    }
 
-  if (topBand) {
-    methodMarks += 1
-    feedback.push('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
+    if (topBand && lines.length >= 3 && hasMathsWorking && hasConclusion) {
+      methodMarks += 1
+      feedback.push('Top Band mode: show a full chain of reasoning and check the answer against sensible values.')
+    } else if (topBand) {
+      feedback.push('Top Band mode: add an extra checked step and a clearer final reasoned conclusion.')
+    }
   }
 
   return {
-    maxMarks: topBand ? 5 : 4,
-    score: Math.min(methodMarks, topBand ? 5 : 4),
+    maxMarks: topBand ? 4 : 3,
+    score: Math.min(methodMarks, topBand ? 4 : 3),
     ao1: ['Method marks are awarded for the steps, working, and correct structure you show.'],
     ao2: ['Explain each step clearly, especially when moving from formula to substitution to answer.'],
     ao3: ['If this is a science question, include the key scientific idea, correct units, and any required conclusion.'],
@@ -137,6 +144,14 @@ function scoreMathsScience(question, answer, topBand) {
   }
 }
 
+function safeParseJson(raw) {
+  try {
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return raw
+  }
+}
+
 async function supabaseRequest(path, options = {}) {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     ...options,
@@ -144,15 +159,22 @@ async function supabaseRequest(path, options = {}) {
       apikey: SUPABASE_ANON_KEY,
       Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers || {}),
     },
   })
-  const text = await response.text()
-  const data = text ? JSON.parse(text) : null
+
+  const raw = await response.text()
+  const data = safeParseJson(raw)
+
   if (!response.ok) {
-    const message = data?.message || data?.hint || response.statusText
+    const message =
+      (data && typeof data === 'object' && (data.message || data.hint)) ||
+      (typeof data === 'string' && data) ||
+      raw ||
+      response.statusText
     throw new Error(message)
   }
+
   return data
 }
 
@@ -164,6 +186,7 @@ function App() {
   const [answerText, setAnswerText] = useState('')
   const [uploadName, setUploadName] = useState('')
   const [uploadPreview, setUploadPreview] = useState('')
+  const [ocrStatus, setOcrStatus] = useState('Upload a scanned question and I will read the text from it.')
   const [markResult, setMarkResult] = useState(null)
   const [recentSessions, setRecentSessions] = useState([])
   const [recentSubscriptions, setRecentSubscriptions] = useState([])
@@ -207,16 +230,32 @@ function App() {
     }
   }
 
-  function handleFileChange(file) {
+  async function handleFileChange(file) {
     if (!file) return
+
     setUploadName(file.name)
     if (uploadPreview) URL.revokeObjectURL(uploadPreview)
     setUploadPreview(URL.createObjectURL(file))
+    setOcrStatus('Reading text from image...')
+
+    try {
+      const { text } = await performOcr(file)
+      const cleanedText = text.trim()
+      if (cleanedText) {
+        setQuestionText((current) => (current.trim() ? current : cleanedText))
+        setOcrStatus('Text read from the image and loaded into the question box.')
+      } else {
+        setOcrStatus('I could not read clear text from the image. You can type it in manually.')
+      }
+    } catch (error) {
+      setOcrStatus(`OCR failed: ${error?.message || String(error)}`)
+    }
   }
 
   async function handleMark() {
     const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
-    const result = analyzer(questionText, answerText, topBand)
+    const questionSource = questionText.trim()
+    const result = analyzer(questionSource, answerText, topBand)
     setMarkResult(result)
     setSaving(true)
 
@@ -228,11 +267,14 @@ function App() {
           {
             exam_board: board,
             mode,
-            question_text: questionText,
+            question_text: questionSource,
             answer_text: answerText,
             upload_name: uploadName,
             score: result.score,
-            feedback: result,
+            feedback: {
+              ...result,
+              ocr_status: ocrStatus,
+            },
           },
         ]),
       })
@@ -300,7 +342,7 @@ function App() {
           <p className="lede">
             Built for essays, maths, and science. Includes AO1 / AO2 / AO3 prompts, method marks,
             official mark-scheme links, a Top Band mode for grade 9 refinement, subscription-ready
-            access, and a Capacitor-ready path for iOS packaging.
+            access, and OCR support for scanned questions.
           </p>
           <div className="hero-actions">
             <a className="chip-link" href={boardLink.href} target="_blank" rel="noreferrer">
@@ -313,10 +355,22 @@ function App() {
         </div>
         <div className="hero-card">
           <div className="stat-row">
-            <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
-            <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
-            <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
-            <div className="stat"><span>Subscription</span><strong>{subscriptionPlan}</strong></div>
+            <div className="stat">
+              <span>Exam board</span>
+              <strong>{board}</strong>
+            </div>
+            <div className="stat">
+              <span>Mode</span>
+              <strong>{modeOptions.find((item) => item.id === mode)?.label}</strong>
+            </div>
+            <div className="stat">
+              <span>Top Band</span>
+              <strong>{topBand ? 'On' : 'Off'}</strong>
+            </div>
+            <div className="stat">
+              <span>Subscription</span>
+              <strong>{subscriptionPlan}</strong>
+            </div>
           </div>
         </div>
       </header>
@@ -337,7 +391,9 @@ function App() {
               Exam board
               <select value={board} onChange={(e) => setBoard(e.target.value)}>
                 {boardOptions.map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
                 ))}
               </select>
             </label>
@@ -345,7 +401,9 @@ function App() {
               Mode
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
                 {modeOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{item.label}</option>
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
                 ))}
               </select>
             </label>
@@ -356,23 +414,38 @@ function App() {
           </div>
 
           <div className="dropzone">
-            <input id="upload" type="file" accept="image/*" onChange={(e) => handleFileChange(e.target.files?.[0])} />
+            <input id="upload" type="file" accept="image/*" onChange={(e) => void handleFileChange(e.target.files?.[0])} />
             <label htmlFor="upload">
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
             </label>
-            {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
+            {uploadName ? (
+              <p className="file-name">Selected: {uploadName}</p>
+            ) : (
+              <p className="file-name">No file selected yet.</p>
+            )}
+            <p className="file-name">{ocrStatus}</p>
             {uploadPreview ? <img className="preview" src={uploadPreview} alt="Uploaded question preview" /> : null}
           </div>
 
           <div className="textareas">
             <label>
               Question or prompt
-              <textarea value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Paste the question text here." rows={7} />
+              <textarea
+                value={questionText}
+                onChange={(e) => setQuestionText(e.target.value)}
+                placeholder="Paste or edit the OCR text here."
+                rows={7}
+              />
             </label>
             <label>
               Student answer / essay / working
-              <textarea value={answerText} onChange={(e) => setAnswerText(e.target.value)} placeholder="Paste the answer, essay, or working here." rows={10} />
+              <textarea
+                value={answerText}
+                onChange={(e) => setAnswerText(e.target.value)}
+                placeholder="Paste the answer, essay, or working here."
+                rows={10}
+              />
             </label>
           </div>
 
@@ -422,9 +495,15 @@ function App() {
 
           <div className="resource-box">
             <h3>Official mark-scheme links</h3>
-            <a href="https://www.aqa.org.uk/find-past-papers-and-mark-schemes" target="_blank" rel="noreferrer">AQA</a>
-            <a href="https://qualifications.pearson.com/en/support/support-topics/exams/past-papers.html" target="_blank" rel="noreferrer">Pearson Edexcel</a>
-            <a href="https://www.ocr.org.uk/qualifications/past-paper-finder/" target="_blank" rel="noreferrer">OCR</a>
+            <a href="https://www.aqa.org.uk/find-past-papers-and-mark-schemes" target="_blank" rel="noreferrer">
+              AQA
+            </a>
+            <a href="https://qualifications.pearson.com/en/support/support-topics/exams/past-papers.html" target="_blank" rel="noreferrer">
+              Pearson Edexcel
+            </a>
+            <a href="https://www.ocr.org.uk/qualifications/past-paper-finder/" target="_blank" rel="noreferrer">
+              OCR
+            </a>
           </div>
         </section>
       </main>
@@ -438,19 +517,30 @@ function App() {
           <div className="subscription-form">
             <label>
               Subscriber email
-              <input type="email" value={subscriptionEmail} onChange={(e) => setSubscriptionEmail(e.target.value)} placeholder="parent@example.com" />
+              <input
+                type="email"
+                value={subscriptionEmail}
+                onChange={(e) => setSubscriptionEmail(e.target.value)}
+                placeholder="parent@example.com"
+              />
             </label>
             <label>
               Plan
               <select value={subscriptionPlan} onChange={(e) => setSubscriptionPlan(e.target.value)}>
                 {subscriptionPlans.map((plan) => (
-                  <option key={plan.id} value={plan.id}>{plan.label} — {plan.price}</option>
+                  <option key={plan.id} value={plan.id}>
+                    {plan.label} — {plan.price}
+                  </option>
                 ))}
               </select>
             </label>
             <p className="muted">{subscriptionPlans.find((plan) => plan.id === subscriptionPlan)?.access}</p>
             <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
-              {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? 'Open Stripe checkout' : 'Create subscription record'}
+              {submittingSubscription
+                ? 'Processing...'
+                : STRIPE_PAYMENT_LINK
+                  ? 'Open Stripe checkout'
+                  : 'Create subscription record'}
             </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
           </div>
@@ -496,7 +586,9 @@ function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent subscriptions</h2>
-          <button className="secondary" onClick={loadSubscriptions}>Refresh</button>
+          <button className="secondary" onClick={loadSubscriptions}>
+            Refresh
+          </button>
         </div>
         <div className="history-list">
           {recentSubscriptions.length ? (
@@ -524,5 +616,5 @@ function App() {
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
+  </React.StrictMode>
 )
