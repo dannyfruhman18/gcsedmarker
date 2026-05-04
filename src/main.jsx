@@ -57,16 +57,17 @@ function maskEmail(email) {
   const value = String(email ?? '').trim()
   if (!value) return ''
 
-  const [localPart, ...domainParts] = value.split('@')
-  const domain = domainParts.join('@')
+  const atIndex = value.indexOf('@')
+  const hasDomain = atIndex !== -1
+  const localPart = hasDomain ? value.slice(0, atIndex) : value
+  const domain = hasDomain ? value.slice(atIndex + 1) : ''
 
-  if (!domain) {
-    if (localPart.length <= 1) return `${localPart[0] ?? ''}***`
-    return `${localPart[0]}***${localPart[localPart.length - 1]}`
+  if (!localPart) {
+    return hasDomain ? `***@${domain || '***'}` : '***'
   }
 
-  if (localPart.length <= 1) return `***@${domain}`
-  return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`
+  const visibleLocal = localPart.length <= 2 ? localPart.slice(0, 1) : `${localPart[0]}***${localPart[localPart.length - 1]}`
+  return hasDomain ? `${visibleLocal}***@${domain}` : `${visibleLocal}***`
 }
 
 async function supabaseRequest(path, options = {}) {
@@ -332,36 +333,51 @@ function App() {
   }
 
   async function handleMark() {
-    const refreshedSubscriptions = await loadSubscriptions(normalizedSubscriptionEmail)
-    const hasActiveSubscription = normalizedSubscriptionEmail
-      ? refreshedSubscriptions.some((row) => {
-          const rowEmail = String(row.email || '').trim().toLowerCase()
-          const rowStatus = String(row.status || '').trim().toLowerCase()
-          return (
-            rowEmail === normalizedSubscriptionEmail &&
-            (rowStatus === 'active' || rowStatus === 'pending_payment')
-          )
-        })
-      : activeSubscription
+    const trimmedQuestion = questionText.trim()
+    const trimmedAnswer = answerText.trim()
 
-    if (STRIPE_PAYMENT_LINK && !hasActiveSubscription) {
+    if (!trimmedQuestion && !trimmedAnswer) {
       setMarkResult({
         score: 0,
         maxMarks: topBand ? 5 : 4,
-        summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for the active record before marking.',
-        ao1: ['This workspace is currently configured to require an active subscription before marking.'],
+        summary: 'Add a question or an answer before marking.',
+        ao1: ['Upload a question, paste the prompt, or enter a student answer so the app has something to mark.'],
         ao2: [],
         ao3: [],
       })
       return
     }
 
-    const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
-    const result = analyzer(answerText, topBand)
-    setMarkResult(result)
     setSaving(true)
-
     try {
+      const refreshedSubscriptions = await loadSubscriptions(normalizedSubscriptionEmail)
+      const hasActiveSubscription = normalizedSubscriptionEmail
+        ? refreshedSubscriptions.some((row) => {
+            const rowEmail = String(row.email || '').trim().toLowerCase()
+            const rowStatus = String(row.status || '').trim().toLowerCase()
+            return (
+              rowEmail === normalizedSubscriptionEmail &&
+              (rowStatus === 'active' || rowStatus === 'pending_payment')
+            )
+          })
+        : activeSubscription
+
+      if (STRIPE_PAYMENT_LINK && !hasActiveSubscription) {
+        setMarkResult({
+          score: 0,
+          maxMarks: topBand ? 5 : 4,
+          summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for the active record before marking.',
+          ao1: ['This workspace is currently configured to require an active subscription before marking.'],
+          ao2: [],
+          ao3: [],
+        })
+        return
+      }
+
+      const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
+      const result = analyzer(answerText, topBand)
+      setMarkResult(result)
+
       await supabaseRequest('/rest/v1/marking_sessions', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
