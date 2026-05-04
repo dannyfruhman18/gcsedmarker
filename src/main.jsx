@@ -89,7 +89,7 @@ async function supabaseRequest(path, options = {}) {
   const data = safeParseJson(text)
 
   if (!response.ok) {
-    const message =
+    const message=
       typeof data === 'string'
         ? data
         : data?.message || data?.error_description || data?.hint || response.statusText
@@ -311,9 +311,29 @@ function App() {
 
   async function handleFileChange(file) {
     if (!file) return
-    setOcrLoading(true)
+
+    const isImageFile =
+      file.type?.startsWith('image/') ||
+      /\.(png|jpe?g|gif|webp|bmp|heic|heif|svg)$/i.test(file.name)
+
     setUploadName(file.name)
-    setUploadPreview(URL.createObjectURL(file))
+
+    if (!isImageFile) {
+      if (uploadPreview) {
+        URL.revokeObjectURL(uploadPreview)
+      }
+      setUploadPreview('')
+      setOcrLoading(false)
+      setOcrStatus('Please upload an image file (JPG, PNG, or similar).')
+      return
+    }
+
+    setOcrLoading(true)
+    if (uploadPreview) {
+      URL.revokeObjectURL(uploadPreview)
+    }
+    const nextPreview = URL.createObjectURL(file)
+    setUploadPreview(nextPreview)
     setOcrStatus('Reading text from the image...')
 
     try {
@@ -417,7 +437,10 @@ function App() {
     setSubmittingSubscription(true)
     try {
       if (STRIPE_PAYMENT_LINK) {
-        window.open(STRIPE_PAYMENT_LINK, '_blank', 'noreferrer')
+        const popup = window.open(STRIPE_PAYMENT_LINK, '_blank', 'noreferrer')
+        if (!popup) {
+          alert('Your browser blocked the Stripe checkout popup. Please allow popups and try again.')
+        }
       }
 
       await supabaseRequest('/rest/v1/subscriptions', {
