@@ -6,8 +6,12 @@ import './styles.css'
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
+const SUPABASE_CONFIG_ERROR =
+  !SUPABASE_URL || !SUPABASE_ANON_KEY
+    ? 'Supabase is not configured. Set both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to load and save data.'
+    : null
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+if (SUPABASE_CONFIG_ERROR) {
   console.error(
     'GCSEmarker configuration error: missing VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY. Supabase requests will fail until these environment variables are provided.',
   )
@@ -49,7 +53,27 @@ function safeParseJson(text) {
   }
 }
 
+function maskEmail(email) {
+  const value = String(email ?? '').trim()
+  if (!value) return ''
+
+  const [localPart, ...domainParts] = value.split('@')
+  const domain = domainParts.join('@')
+
+  if (!domain) {
+    if (localPart.length <= 1) return `${localPart[0] ?? ''}***`
+    return `${localPart[0]}***${localPart[localPart.length - 1]}`
+  }
+
+  if (localPart.length <= 1) return `***@${domain}`
+  return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`
+}
+
 async function supabaseRequest(path, options = {}) {
+  if (SUPABASE_CONFIG_ERROR) {
+    throw new Error(SUPABASE_CONFIG_ERROR)
+  }
+
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     ...options,
     headers: {
@@ -64,9 +88,10 @@ async function supabaseRequest(path, options = {}) {
   const data = safeParseJson(text)
 
   if (!response.ok) {
-    const message = typeof data === 'string'
-      ? data
-      : data?.message || data?.error_description || data?.hint || response.statusText
+    const message =
+      typeof data === 'string'
+        ? data
+        : data?.message || data?.error_description || data?.hint || response.statusText
     throw new Error(`${message} (${response.status})`)
   }
 
@@ -209,6 +234,7 @@ function App() {
   const [subscriptionPlan, setSubscriptionPlan] = useState('top-band')
   const [subscriptionResult, setSubscriptionResult] = useState('')
   const [submittingSubscription, setSubmittingSubscription] = useState(false)
+  const [error, setError] = useState(SUPABASE_CONFIG_ERROR)
 
   const boardLink = useMemo(() => BOARD_LINKS[board], [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -246,8 +272,12 @@ function App() {
         headers: { Accept: 'application/json' },
       })
       setRecentSessions(rows ?? [])
-    } catch (error) {
-      console.error(error)
+      setError((current) =>
+        current?.startsWith('Could not load recent marking sessions:') ? null : current,
+      )
+    } catch (err) {
+      console.error(err)
+      setError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
     } finally {
       setLoadingSessions(false)
     }
@@ -261,8 +291,12 @@ function App() {
         headers: { Accept: 'application/json' },
       })
       setRecentSubscriptions(rows ?? [])
-    } catch (error) {
-      console.error(error)
+      setError((current) =>
+        current?.startsWith('Could not load recent subscriptions:') ? null : current,
+      )
+    } catch (err) {
+      console.error(err)
+      setError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
     }
   }
 
@@ -280,8 +314,8 @@ function App() {
       } else {
         setOcrStatus('No clear text found. You can type or paste the question manually.')
       }
-    } catch (error) {
-      console.error(error)
+    } catch (err) {
+      console.error(err)
       setOcrStatus('OCR failed — please type the question manually.')
     }
   }
@@ -320,11 +354,16 @@ function App() {
           },
         ]),
       })
+      setError((current) =>
+        current?.startsWith('Supabase save failed:') ? null : current,
+      )
       await loadSessions()
-    } catch (error) {
+    } catch (err) {
+      const message = `Supabase save failed: ${err?.message || String(err)}`
+      setError(message)
       setMarkResult((current) => ({
         ...(current || {}),
-        storageError: `Supabase save failed: ${error?.message || String(error)}`,
+        storageError: message,
       }))
     } finally {
       setSaving(false)
@@ -357,14 +396,19 @@ function App() {
           },
         ]),
       })
+      setError((current) =>
+        current?.startsWith('Subscription save failed:') ? null : current,
+      )
       setSubscriptionResult(
         STRIPE_PAYMENT_LINK
           ? 'Stripe checkout opened and subscription record saved in Supabase as pending_payment.'
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.'
       )
       await loadSubscriptions()
-    } catch (error) {
-      setSubscriptionResult(`Subscription save failed: ${error?.message || String(error)}`)
+    } catch (err) {
+      const message = `Subscription save failed: ${err?.message || String(err)}`
+      setError(message)
+      setSubscriptionResult(message)
     } finally {
       setSubmittingSubscription(false)
     }
@@ -404,6 +448,13 @@ function App() {
           </div>
         </div>
       </header>
+
+      {error ? (
+        <section className="panel" role="alert" aria-live="assertive">
+          <h2>Something went wrong</h2>
+          <p className="error">{error}</p>
+        </section>
+      ) : null}
 
       <main className="chat-layout">
         <section className="panel">
@@ -588,7 +639,7 @@ function App() {
             recentSubscriptions.map((subscription) => (
               <article key={subscription.id} className="history-item">
                 <div>
-                  <strong>{subscription.email}</strong>
+                  <strong>{maskEmail(subscription.email)}</strong>
                   <span>{subscription.plan}</span>
                 </div>
                 <div>
