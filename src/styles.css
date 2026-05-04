@@ -125,13 +125,16 @@ label {
   color: #d9e4f8;
   font-size: 0.94rem;
 }
-select, textarea, .dropzone input[type='file'], input[type='email'] {
+select, textarea, input[type='email'] {
   width: 100%;
   border-radius: 14px;
   border: 1px solid rgba(142, 197, 255, 0.14);
   background: rgba(255, 255, 255, 0.04);
   color: #eef4ff;
   padding: 12px 14px;
+}
+.dropzone input[type='file'] {
+  display: none;
 }
 textarea { resize: vertical; min-height: 110px; }
 .toggle {
@@ -241,11 +244,26 @@ textarea { resize: vertical; min-height: 110px; }
 .result-note { color: #d9e4f8; margin: 0; }
 .board-links { text-align: right; }
 @media (max-width: 780px) {
-  .stat-row, .control-row, .subscription-grid { grid-template-columns: 1fr; }
-  .panel-header { flex-direction: column; align-items: flex-start; }
-  .board-links { text-align: left; }
-}
-@media (max-width: 780px) {
+  .stat-row,
+  .control-row,
+  .subscription-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .board-links {
+    text-align: left;
+  }
+
+  .brand-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .history-item {
     flex-direction: column;
   }

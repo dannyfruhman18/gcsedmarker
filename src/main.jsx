@@ -205,13 +205,19 @@ function App() {
   const [submittingSubscription, setSubmittingSubscription] = useState(false)
 
   const boardLink = useMemo(() => BOARD_LINKS[board], [board])
+  const normalizedSubscriptionEmail = useMemo(
+    () => subscriptionEmail.trim().toLowerCase(),
+    [subscriptionEmail],
+  )
   const activeSubscription = useMemo(() => {
-    const email = subscriptionEmail.trim().toLowerCase()
-    if (!email) return false
+    if (!normalizedSubscriptionEmail) return false
+
     return recentSubscriptions.some((row) => {
-      return String(row.email || '').toLowerCase() === email && String(row.status || '').toLowerCase() === 'active'
+      const rowEmail = String(row.email || '').trim().toLowerCase()
+      const rowStatus = String(row.status || '').trim().toLowerCase()
+      return rowEmail === normalizedSubscriptionEmail && rowStatus === 'active'
     })
-  }, [recentSubscriptions, subscriptionEmail])
+  }, [recentSubscriptions, normalizedSubscriptionEmail])
 
   useEffect(() => {
     void loadSessions()
@@ -235,7 +241,7 @@ function App() {
 
   async function loadSubscriptions() {
     try {
-      const rows = await supabaseRequest('/rest/v1/subscriptions?select=*&order=created_at.desc&limit=5', {
+      const rows = await supabaseRequest('/rest/v1/subscriptions?select=*&order=created_at.desc&limit=50', {
         method: 'GET',
         headers: { Accept: 'application/json' },
       })
