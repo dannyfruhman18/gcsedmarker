@@ -225,6 +225,7 @@ function App() {
   const [uploadName, setUploadName] = useState('')
   const [uploadPreview, setUploadPreview] = useState('')
   const [ocrStatus, setOcrStatus] = useState('Upload an image and OCR will fill the question box.')
+  const [ocrLoading, setOcrLoading] = useState(false)
   const [markResult, setMarkResult] = useState(null)
   const [recentSessions, setRecentSessions] = useState([])
   const [recentSubscriptions, setRecentSubscriptions] = useState([])
@@ -235,6 +236,8 @@ function App() {
   const [subscriptionResult, setSubscriptionResult] = useState('')
   const [submittingSubscription, setSubmittingSubscription] = useState(false)
   const [error, setError] = useState(SUPABASE_CONFIG_ERROR)
+  const [sessionsError, setSessionsError] = useState(null)
+  const [subscriptionsError, setSubscriptionsError] = useState(null)
 
   const boardLink = useMemo(() => BOARD_LINKS[board], [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -272,10 +275,10 @@ function App() {
         headers: { Accept: 'application/json' },
       })
       setRecentSessions(rows ?? [])
-      setError(null)
+      setSessionsError(null)
     } catch (err) {
       console.error(err)
-      setError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
+      setSessionsError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
     } finally {
       setLoadingSessions(false)
     }
@@ -289,15 +292,16 @@ function App() {
         headers: { Accept: 'application/json' },
       })
       setRecentSubscriptions(rows ?? [])
-      setError(null)
+      setSubscriptionsError(null)
     } catch (err) {
       console.error(err)
-      setError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
+      setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
     }
   }
 
   async function handleFileChange(file) {
     if (!file) return
+    setOcrLoading(true)
     setUploadName(file.name)
     setUploadPreview(URL.createObjectURL(file))
     setOcrStatus('Reading text from the image...')
@@ -313,6 +317,8 @@ function App() {
     } catch (err) {
       console.error(err)
       setOcrStatus('OCR failed — please type the question manually.')
+    } finally {
+      setOcrLoading(false)
     }
   }
 
@@ -441,10 +447,12 @@ function App() {
         </div>
       </header>
 
-      {error ? (
+      {error || sessionsError || subscriptionsError ? (
         <section className="panel" role="alert" aria-live="assertive">
           <h2>Something went wrong</h2>
-          <p className="error">{error}</p>
+          {error ? <p className="error">{error}</p> : null}
+          {sessionsError ? <p className="error">{sessionsError}</p> : null}
+          {subscriptionsError ? <p className="error">{subscriptionsError}</p> : null}
         </section>
       ) : null}
 
@@ -504,7 +512,7 @@ function App() {
             </label>
           </div>
 
-          <button className="primary" onClick={handleMark} disabled={saving}>
+          <button className="primary" onClick={handleMark} disabled={saving || ocrLoading}>
             {saving ? 'Saving...' : 'Mark answer'}
           </button>
         </section>

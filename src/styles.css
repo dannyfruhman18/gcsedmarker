@@ -248,6 +248,20 @@ textarea { resize: vertical; min-height: 110px; }
 .tier-card span { color: #8dd0ff; }
 .result-note { color: #d9e4f8; margin: 0; }
 .board-links { text-align: right; }
+@media (max-width: 950px) and (min-width: 781px) {
+  .stat-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .control-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .toggle {
+    grid-column: span 2;
+  }
+  .subscription-grid {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 780px) {
   .stat-row,
   .control-row,
