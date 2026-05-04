@@ -307,3 +307,14 @@ textarea { resize: vertical; min-height: 110px; }
     flex-direction: column;
   }
 }
+
+:focus-visible {
+  outline: 2px solid #8ec5ff;
+  outline-offset: 2px;
+}
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  box-shadow: 0 0 0 4px rgba(142, 197, 255, 0.25);
+}
