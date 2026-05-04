@@ -7,6 +7,12 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
 
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error(
+    'GCSEmarker configuration error: missing VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY. Supabase requests will fail until these environment variables are provided.',
+  )
+}
+
 const BOARD_LINKS = {
   AQA: {
     label: 'AQA past papers and mark schemes',
@@ -220,6 +226,14 @@ function App() {
   }, [recentSubscriptions, normalizedSubscriptionEmail])
 
   useEffect(() => {
+    return () => {
+      if (uploadPreview) {
+        URL.revokeObjectURL(uploadPreview)
+      }
+    }
+  }, [uploadPreview])
+
+  useEffect(() => {
     void loadSessions()
     void loadSubscriptions()
   }, [])
@@ -241,7 +255,8 @@ function App() {
 
   async function loadSubscriptions() {
     try {
-      const rows = await supabaseRequest('/rest/v1/subscriptions?select=*&order=created_at.desc&limit=50', {
+      // TODO: Query subscriptions by email/status on the server instead of loading a broad recent history for better scale.
+      const rows = await supabaseRequest('/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200', {
         method: 'GET',
         headers: { Accept: 'application/json' },
       })
@@ -254,7 +269,6 @@ function App() {
   async function handleFileChange(file) {
     if (!file) return
     setUploadName(file.name)
-    if (uploadPreview) URL.revokeObjectURL(uploadPreview)
     setUploadPreview(URL.createObjectURL(file))
     setOcrStatus('Reading text from the image...')
 
