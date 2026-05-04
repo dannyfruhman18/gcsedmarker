@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
-  appId: 'com.dannyfruhman.gcsemarker',
+  appId: 'com.dannyfruhman.gcsedmarker',
   appName: 'GCSEmarker',
   webDir: 'dist',
   bundledWebRuntime: false,

@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { createWorker } from 'tesseract.js'
 import './styles.css'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? 'https://kgygnazvnvjgtypaokug.supabase.co'
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_OXGxr2KQxcuNgrVs_UQrCw_dX8O72XM'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
 
 const BOARD_LINKS = {
