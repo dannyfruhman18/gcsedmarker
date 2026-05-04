@@ -169,7 +169,7 @@ function scoreMathsScience(answer, topBand) {
     methodMarks.push('Use equations, substitutions, or calculation steps to earn method marks.')
   }
 
-  if (/\b(cm|mm|m|kg|g|n|j|w|s|°c|mol|dm\^?3)\b/i.test(text)) {
+  if (/\b(cm|mm|kg|g|mol|dm\^?3|°c)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)) {
     marks.add('units')
     methodMarks.push('You have included units or scientific measurement language.')
   } else {
@@ -272,9 +272,7 @@ function App() {
         headers: { Accept: 'application/json' },
       })
       setRecentSessions(rows ?? [])
-      setError((current) =>
-        current?.startsWith('Could not load recent marking sessions:') ? null : current,
-      )
+      setError(null)
     } catch (err) {
       console.error(err)
       setError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
@@ -291,9 +289,7 @@ function App() {
         headers: { Accept: 'application/json' },
       })
       setRecentSubscriptions(rows ?? [])
-      setError((current) =>
-        current?.startsWith('Could not load recent subscriptions:') ? null : current,
-      )
+      setError(null)
     } catch (err) {
       console.error(err)
       setError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
@@ -354,9 +350,7 @@ function App() {
           },
         ]),
       })
-      setError((current) =>
-        current?.startsWith('Supabase save failed:') ? null : current,
-      )
+      setError(null)
       await loadSessions()
     } catch (err) {
       const message = `Supabase save failed: ${err?.message || String(err)}`
@@ -372,8 +366,8 @@ function App() {
 
   async function handleSubscription() {
     const email = subscriptionEmail.trim()
-    if (!email) {
-      setSubscriptionResult('Add an email address first.')
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setSubscriptionResult('Add a valid email address.')
       return
     }
 
@@ -396,9 +390,7 @@ function App() {
           },
         ]),
       })
-      setError((current) =>
-        current?.startsWith('Subscription save failed:') ? null : current,
-      )
+      setError(null)
       setSubscriptionResult(
         STRIPE_PAYMENT_LINK
           ? 'Stripe checkout opened and subscription record saved in Supabase as pending_payment.'

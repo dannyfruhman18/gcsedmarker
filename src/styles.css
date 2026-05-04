@@ -40,6 +40,11 @@ button, select, textarea, input { font: inherit; }
   margin-bottom: 18px;
 }
 
+.hero-card {
+  display: grid;
+  gap: 16px;
+}
+
 .brand-row {
   display: flex;
   gap: 14px;
