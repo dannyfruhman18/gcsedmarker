@@ -245,3 +245,8 @@ textarea { resize: vertical; min-height: 110px; }
   .panel-header { flex-direction: column; align-items: flex-start; }
   .board-links { text-align: left; }
 }
+@media (max-width: 780px) {
+  .history-item {
+    flex-direction: column;
+  }
+}

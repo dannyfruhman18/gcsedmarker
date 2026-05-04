@@ -280,7 +280,7 @@ function App() {
     }
 
     const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
-    const result = analyzer(mode === 'essay' ? answerText : answerText, topBand)
+    const result = analyzer(answerText, topBand)
     setMarkResult(result)
     setSaving(true)
 
