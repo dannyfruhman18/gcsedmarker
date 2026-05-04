@@ -250,7 +250,10 @@ function App() {
     return recentSubscriptions.some((row) => {
       const rowEmail = String(row.email || '').trim().toLowerCase()
       const rowStatus = String(row.status || '').trim().toLowerCase()
-      return rowEmail === normalizedSubscriptionEmail && rowStatus === 'active'
+      return (
+        rowEmail === normalizedSubscriptionEmail &&
+        (rowStatus === 'active' || rowStatus === 'pending_payment')
+      )
     })
   }, [recentSubscriptions, normalizedSubscriptionEmail])
 
@@ -284,18 +287,24 @@ function App() {
     }
   }
 
-  async function loadSubscriptions() {
+  async function loadSubscriptions(email = '') {
     try {
+      const emailFilter = email ? `&email=eq.${encodeURIComponent(email)}` : ''
       // TODO: Query subscriptions by email/status on the server instead of loading a broad recent history for better scale.
-      const rows = await supabaseRequest('/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200', {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      })
+      const rows = await supabaseRequest(
+        `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200${emailFilter}`,
+        {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        },
+      )
       setRecentSubscriptions(rows ?? [])
       setSubscriptionsError(null)
+      return rows ?? []
     } catch (err) {
       console.error(err)
       setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
+      return []
     }
   }
 
@@ -323,7 +332,19 @@ function App() {
   }
 
   async function handleMark() {
-    if (STRIPE_PAYMENT_LINK && !activeSubscription) {
+    const refreshedSubscriptions = await loadSubscriptions(normalizedSubscriptionEmail)
+    const hasActiveSubscription = normalizedSubscriptionEmail
+      ? refreshedSubscriptions.some((row) => {
+          const rowEmail = String(row.email || '').trim().toLowerCase()
+          const rowStatus = String(row.status || '').trim().toLowerCase()
+          return (
+            rowEmail === normalizedSubscriptionEmail &&
+            (rowStatus === 'active' || rowStatus === 'pending_payment')
+          )
+        })
+      : activeSubscription
+
+    if (STRIPE_PAYMENT_LINK && !hasActiveSubscription) {
       setMarkResult({
         score: 0,
         maxMarks: topBand ? 5 : 4,
@@ -396,13 +417,13 @@ function App() {
           },
         ]),
       })
+      await loadSubscriptions(normalizedSubscriptionEmail)
       setError(null)
       setSubscriptionResult(
         STRIPE_PAYMENT_LINK
           ? 'Stripe checkout opened and subscription record saved in Supabase as pending_payment.'
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.'
       )
-      await loadSubscriptions()
     } catch (err) {
       const message = `Subscription save failed: ${err?.message || String(err)}`
       setError(message)
@@ -588,6 +609,9 @@ function App() {
             <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
               {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? 'Open Stripe checkout' : 'Create subscription record'}
             </button>
+            <button className="secondary" onClick={() => void loadSubscriptions(normalizedSubscriptionEmail)}>
+              Refresh Status
+            </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
           </div>
           <div className="subscription-cards">
@@ -632,7 +656,7 @@ function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent subscriptions</h2>
-          <button className="secondary" onClick={loadSubscriptions}>Refresh</button>
+          <button className="secondary" onClick={() => void loadSubscriptions(normalizedSubscriptionEmail)}>Refresh</button>
         </div>
         <div className="history-list">
           {recentSubscriptions.length ? (
