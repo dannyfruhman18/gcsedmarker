@@ -67,7 +67,7 @@ function maskEmail(email) {
   }
 
   const visibleLocal = localPart.length <= 2 ? localPart.slice(0, 1) : `${localPart[0]}***${localPart[localPart.length - 1]}`
-  return hasDomain ? `${visibleLocal}***@${domain}` : `${visibleLocal}***`
+  return hasDomain ? `${visibleLocal}@${domain || '***'}` : visibleLocal
 }
 
 async function supabaseRequest(path, options = {}) {
