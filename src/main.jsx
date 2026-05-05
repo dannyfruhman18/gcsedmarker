@@ -18,7 +18,9 @@ const SUPABASE_CONFIG_ERROR =
 
 const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing', 'paid', 'past_due'])
+// Includes pending_payment for demo/testing users who have started checkout.
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing', 'paid', 'past_due', 'pending_payment'])
+const MAX_VISIBLE_HISTORY_ROWS = 5
 
 if (SUPABASE_CONFIG_ERROR) {
   console.error(
@@ -177,7 +179,7 @@ function scoreEssay(answer, topBand) {
   if (topBand) {
     ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
     ao2.push('Top Band mode: use linked chains of reasoning and compare alternatives instead of listing points.')
-    if (length >= 140) score += 1
+    ao3.push('Structural signal placeholder: check for paragraphing, counterargument, and conclusion flow here instead of using raw word count.')
   }
 
   return {
@@ -502,6 +504,12 @@ function App() {
     if (!trimmedAnswer) {
       setMarkResult(null)
       setError('Add a student answer, essay, or working before marking.')
+      return
+    }
+
+    if (STRIPE_PAYMENT_LINK && !hasSubscriptionEmail) {
+      setMarkResult(null)
+      setError('Add a subscriber email before marking when Stripe payments are enabled.')
       return
     }
 
@@ -871,7 +879,7 @@ function App() {
         </div>
         <div className="history-list">
           {recentSessions.length ? (
-            recentSessions.map((session, index) => (
+            recentSessions.slice(0, MAX_VISIBLE_HISTORY_ROWS).map((session, index) => (
               <article key={session?.id ?? `session-${index}`} className="history-item">
                 <div>
                   <strong>{session?.exam_board ?? 'Unknown board'}</strong>
@@ -898,7 +906,7 @@ function App() {
         </div>
         <div className="history-list">
           {recentSubscriptions.length ? (
-            recentSubscriptions.map((subscription, index) => (
+            recentSubscriptions.slice(0, MAX_VISIBLE_HISTORY_ROWS).map((subscription, index) => (
               <article key={subscription?.id ?? `subscription-${index}`} className="history-item">
                 <div>
                   <strong>{maskEmail(subscription?.email)}</strong>
