@@ -339,9 +339,7 @@ export default function App() {
           if (!existingText) return extractedText
           if (!extractedText) return currentText
 
-          return `${existingText}
-
-${extractedText}`
+          return `${existingText}\n\n${extractedText}`
         })
         setOcrStatus(`Text read from image (${extracted.split(/\s+/).filter(Boolean).length} words).`)
       } else {
@@ -613,7 +611,7 @@ ${extractedText}`
       ) : null}
 
       <main className="chat-layout">
-        <section className="panel">
+        <section className={`panel dropzone ${ocrLoading ? 'loading' : ''}`}>
           <div className="panel-header">
             <h2>Mark a GCSE answer</h2>
             <div className="board-links">
@@ -676,9 +674,8 @@ ${extractedText}`
               {uploadPreview ? (
                 <button
                   type="button"
-                  className="secondary"
+                  className="clear-button"
                   onClick={clearUpload}
-                  style={{ width: 'auto', marginTop: 0, padding: '8px 12px' }}
                 >
                   Clear
                 </button>
