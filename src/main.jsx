@@ -74,6 +74,17 @@ function normalizeEmail(value) {
   return String(value ?? '').trim().toLowerCase()
 }
 
+function isActiveSubscriptionRow(row) {
+  return String(row?.status || '').trim().toLowerCase() === 'active'
+}
+
+function subscriptionHasActiveAccess(rows, email) {
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail || !Array.isArray(rows)) return false
+
+  return rows.some((row) => normalizeEmail(row?.email) === normalizedEmail && isActiveSubscriptionRow(row))
+}
+
 function mergeHistoryRows(existingRows, incomingRows) {
   const mergedRows = new Map()
   for (const row of [...(Array.isArray(existingRows) ? existingRows : []), ...(Array.isArray(incomingRows) ? incomingRows : [])]) {
@@ -269,16 +280,7 @@ function App() {
     [subscriptionEmail],
   )
   const activeSubscription = useMemo(() => {
-    if (!normalizedSubscriptionEmail) return false
-
-    return recentSubscriptions.some((row) => {
-      const rowEmail = normalizeEmail(row.email)
-      const rowStatus = String(row.status || '').trim().toLowerCase()
-      return (
-        rowEmail === normalizedSubscriptionEmail &&
-        (rowStatus === 'active' || rowStatus === 'pending_payment')
-      )
-    })
+    return subscriptionHasActiveAccess(recentSubscriptions, normalizedSubscriptionEmail)
   }, [recentSubscriptions, normalizedSubscriptionEmail])
 
   useEffect(() => {
@@ -295,7 +297,7 @@ function App() {
   }, [])
 
   async function loadSessions() {
-    setLoadingSessions(true)
+    setSessionsError(null)
     try {
       const rows = await supabaseRequest('/rest/v1/marking_sessions?select=*&order=created_at.desc&limit=5', {
         method: 'GET',
@@ -315,6 +317,7 @@ function App() {
   }
 
   async function loadSubscriptions(email = '') {
+    setSubscriptionsError(null)
     try {
       const normalizedEmail = normalizeEmail(email)
       const emailFilter = normalizedEmail ? `&email=ilike.${encodeURIComponent(normalizedEmail)}` : ''
@@ -327,18 +330,19 @@ function App() {
         },
       )
       const nextRows = Array.isArray(rows) ? rows : []
-      setRecentSubscriptions((currentRows) => (normalizedEmail ? mergeHistoryRows(currentRows, nextRows) : nextRows))
+      setRecentSubscriptions(nextRows)
       setSubscriptionsError(null)
       return nextRows
     } catch (err) {
       console.error(err)
       setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
-      return []
+      return null
     }
   }
 
   async function handleFileChange(file) {
     if (!file) return
+    setQuestionText('')
     setOcrLoading(true)
     setUploadName(file.name)
     setUploadPreview(URL.createObjectURL(file))
@@ -361,6 +365,9 @@ function App() {
   }
 
   async function handleMark() {
+    setError(null)
+    setSubscriptionsError(null)
+
     const trimmedQuestion = questionText.trim()
     const trimmedAnswer = answerText.trim()
 
@@ -379,22 +386,16 @@ function App() {
     setSaving(true)
     try {
       const refreshedSubscriptions = await loadSubscriptions(normalizedSubscriptionEmail)
-      const hasActiveSubscription = normalizedSubscriptionEmail
-        ? refreshedSubscriptions.some((row) => {
-            const rowEmail = normalizeEmail(row.email)
-            const rowStatus = String(row.status || '').trim().toLowerCase()
-            return (
-              rowEmail === normalizedSubscriptionEmail &&
-              (rowStatus === 'active' || rowStatus === 'pending_payment')
-            )
-          })
-        : activeSubscription
+      const subscriptionLoadFailed = refreshedSubscriptions === null
+      const hasActiveSubscription = subscriptionLoadFailed
+        ? activeSubscription
+        : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedSubscriptionEmail)
 
-      if (STRIPE_PAYMENT_LINK && !hasActiveSubscription) {
+      if (STRIPE_PAYMENT_LINK && !subscriptionLoadFailed && !hasActiveSubscription) {
         setMarkResult({
           score: 0,
           maxMarks: topBand ? 5 : 4,
-          summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for the active record before marking.',
+          summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.',
           ao1: ['This workspace is currently configured to require an active subscription before marking.'],
           ao2: [],
           ao3: [],
@@ -436,6 +437,10 @@ function App() {
   }
 
   async function handleSubscription() {
+    setError(null)
+    setSubscriptionResult('')
+    setSubscriptionsError(null)
+
     const email = normalizeEmail(subscriptionEmail)
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setSubscriptionResult('Add a valid email address.')
@@ -444,10 +449,6 @@ function App() {
 
     setSubmittingSubscription(true)
     try {
-      if (STRIPE_PAYMENT_LINK) {
-        window.open(STRIPE_PAYMENT_LINK, '_blank', 'noreferrer')
-      }
-
       await supabaseRequest('/rest/v1/subscriptions', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
@@ -461,11 +462,20 @@ function App() {
           },
         ]),
       })
+
+      let stripePopupBlocked = false
+      if (STRIPE_PAYMENT_LINK) {
+        const stripeWindow = window.open(STRIPE_PAYMENT_LINK, '_blank', 'noreferrer')
+        stripePopupBlocked = !stripeWindow
+      }
+
       await loadSubscriptions(normalizedSubscriptionEmail)
       setError(null)
       setSubscriptionResult(
         STRIPE_PAYMENT_LINK
-          ? 'Stripe checkout opened and subscription record saved in Supabase as pending_payment.'
+          ? stripePopupBlocked
+            ? 'Subscription record saved in Supabase, but the Stripe popup was blocked. Please allow popups or open the payment link manually.'
+            : 'Subscription record saved in Supabase and Stripe checkout opened.'
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.'
       )
     } catch (err) {
