@@ -44,6 +44,10 @@ async function extractQuestionTextFromImage(file, onProgress, worker) {
   return extractedText
 }
 
+const OCR_WORKER_INIT_TIMEOUT_MS = 30_000
+const OCR_WORKER_INIT_TIMEOUT_ERROR =
+  'OCR worker initialization timed out after 30 seconds. Please try again or reload the page.'
+
 export default function App() {
   const [board, setBoard] = useState('AQA')
   const [mode, setMode] = useState('essay')
@@ -93,33 +97,51 @@ export default function App() {
     }
 
     if (!workerInitPromiseRef.current) {
-      workerInitPromiseRef.current = createWorker('eng', 1, {
-        logger: (message) => {
-          if (typeof ocrProgressHandlerRef.current === 'function') {
-            ocrProgressHandlerRef.current(message)
-          }
-        },
-      })
-        .then(async (worker) => {
-          if (!mountedRef.current) {
-            try {
-              await worker.terminate()
-            } catch (terminateErr) {
-              console.warn('OCR worker cleanup failed during initialization:', terminateErr)
+      workerInitPromiseRef.current = (() => {
+        let timeoutId
+        const initPromise = createWorker('eng', 1, {
+          logger: (message) => {
+            if (typeof ocrProgressHandlerRef.current === 'function') {
+              ocrProgressHandlerRef.current(message)
             }
-            throw new Error('OCR worker initialization was cancelled.')
-          }
+          },
+        })
 
-          workerRef.current = worker
-          return worker
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error(OCR_WORKER_INIT_TIMEOUT_ERROR))
+          }, OCR_WORKER_INIT_TIMEOUT_MS)
         })
-        .catch((err) => {
-          workerRef.current = null
-          throw err
-        })
-        .finally(() => {
-          workerInitPromiseRef.current = null
-        })
+
+        return Promise.race([initPromise, timeoutPromise])
+          .then(async (worker) => {
+            if (!mountedRef.current) {
+              try {
+                await worker.terminate()
+              } catch (terminateErr) {
+                console.warn('OCR worker cleanup failed during initialization:', terminateErr)
+              }
+              throw new Error('OCR worker initialization was cancelled.')
+            }
+
+            workerRef.current = worker
+            return worker
+          })
+          .catch((err) => {
+            const errorMessage = err?.message || String(err)
+            if (errorMessage === OCR_WORKER_INIT_TIMEOUT_ERROR) {
+              void initPromise.then((worker) => worker.terminate().catch(() => {})).catch(() => {})
+            }
+            workerRef.current = null
+            throw err
+          })
+          .finally(() => {
+            if (timeoutId) {
+              clearTimeout(timeoutId)
+            }
+            workerInitPromiseRef.current = null
+          })
+      })()
     }
 
     const worker = await workerInitPromiseRef.current
@@ -414,10 +436,16 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       console.error('OCR failed while reading uploaded question:', err)
+      const errorMessage = err?.message || String(err)
+      const sanitizedErrorMessage = errorMessage.endsWith('.') ? errorMessage.slice(0, -1) : errorMessage
       if (workerRef.current) {
-        setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
+        setOcrStatus(
+          `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under 5MB.`,
+        )
       } else {
-        setOcrStatus('OCR could not start. Please try again or reload the page.')
+        setOcrStatus(
+          `OCR could not start: ${sanitizedErrorMessage}. Please try again or reload the page.`,
+        )
       }
     } finally {
       if (isLatestUpload() && mountedRef.current) {
@@ -435,7 +463,6 @@ export default function App() {
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
-    const isOwnerEmail = normalizedMarkEmail === 'markfruhman@gmail.com'
 
     if (!trimmedQuestion && !trimmedAnswer) {
       setMarkResult(null)
@@ -474,12 +501,12 @@ export default function App() {
 
     setMarking(true)
     try {
-      const refreshedSubscriptions = hasSubscriptionEmail && !isOwnerEmail
+      const refreshedSubscriptions = hasSubscriptionEmail
         ? await loadSubscriptions(normalizedMarkEmail, { updateRecentSubscriptions: false })
         : []
       if (!mountedRef.current) return
 
-      const subscriptionLoadFailed = hasSubscriptionEmail && !isOwnerEmail && refreshedSubscriptions === null
+      const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && subscriptionLoadFailed) {
         const message = 'Subscription status could not be verified. Please refresh status and try again.'
         if (mountedRef.current) {
@@ -499,9 +526,7 @@ export default function App() {
 
       const hasActiveSubscription = !hasSubscriptionEmail
         ? true
-        : isOwnerEmail
-          ? true
-          : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
+        : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
 
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !hasActiveSubscription) {
         if (mountedRef.current) {
