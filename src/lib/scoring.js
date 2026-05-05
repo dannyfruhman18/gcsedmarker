@@ -50,15 +50,91 @@ const QUESTION_STOPWORDS = new Set([
   'answer',
   'question',
   'prompt',
+  'explain',
+  'compare',
+  'contrast',
+  'evaluate',
+  'describe',
+  'analyse',
+  'analyze',
+  'assess',
+  'calculate',
+  'justify',
+  'discuss',
+  'outline',
+  'state',
+  'identify',
+  'name',
+  'define',
+  'summarise',
+  'summarize',
+  'show',
+  'work',
+  'working',
+  'reason',
+  'reasons',
+  'why',
+  'how',
+  'give',
+  'list',
+  'find',
+  'determine',
+  'prove',
+  'say',
+  'tell',
 ])
+
+const PROMPT_FAMILIES = [
+  {
+    id: 'explain',
+    label: 'Explain',
+    questionPattern: /\b(explain|why|how(?:\s+(?:does|do|is|are))?|cause|causes|reason|reasons|because)\b/i,
+    responsePattern: /\b(because|therefore|as a result|this shows|which means|so|since|due to|hence)\b/i,
+  },
+  {
+    id: 'compare',
+    label: 'Compare',
+    questionPattern: /\b(compare|contrast|compare and contrast|similarities?|differences?|in contrast|whereas|while|both)\b/i,
+    responsePattern: /\b(both|whereas|while|however|similarly|in contrast|difference|differences?|similar(?:ly)?|on the other hand)\b/i,
+  },
+  {
+    id: 'evaluate',
+    label: 'Evaluate',
+    questionPattern: /\b(evaluate|assess|judge|judgement|judgment|to what extent|how far|weigh up)\b/i,
+    responsePattern: /\b(overall|judgement|judgment|however|although|balance|weigh|more important|to a large extent|in conclusion)\b/i,
+  },
+  {
+    id: 'describe',
+    label: 'Describe',
+    questionPattern: /\b(describe|outline|state|identify|name|give|what is|which is|list)\b/i,
+    responsePattern: /\b(there is|there are|it is|shown by|has|contains|includes|features|is called|refers to|consists of)\b/i,
+  },
+  {
+    id: 'analyse',
+    label: 'Analyse',
+    questionPattern: /\b(analyse|analyze|discuss|justify|summarise|summarize|interpret)\b/i,
+    responsePattern: /\b(because|therefore|suggests|implies|shows|leads to|evidence|overall|in summary|on the other hand)\b/i,
+  },
+  {
+    id: 'calculate',
+    label: 'Calculate',
+    questionPattern: /\b(calculate|work out|determine|find|show that|complete the calculation)\b/i,
+    responsePattern: /\b(\d|=|×|÷|working|formula|equation|substitut|solve|step(?:s)?|final answer)\b/i,
+  },
+]
 
 function normaliseText(value) {
   return String(value ?? '').trim()
 }
 
 function extractKeywords(text) {
-  const words = normaliseText(text).toLowerCase().match(/\b[a-z]{4,}\b/g) ?? []
-  return words.filter((word) => !QUESTION_STOPWORDS.has(word))
+  const words = normaliseText(text).toLowerCase().match(/\b[a-z0-9]{2,}\b/g) ?? []
+  return words.filter((word) => !QUESTION_STOPWORDS.has(word) && !/^\d+$/.test(word))
+}
+
+function detectPromptFamily(questionText) {
+  const question = normaliseText(questionText)
+  return PROMPT_FAMILIES.find((family) => family.questionPattern.test(question)) ?? null
 }
 
 function normalizeScoringOptions(input, legacyTopBand, legacyBoard = 'AQA') {
@@ -82,38 +158,15 @@ function normalizeScoringOptions(input, legacyTopBand, legacyBoard = 'AQA') {
 function buildQuestionAnalysis(questionText, answerText) {
   const question = normaliseText(questionText)
   const answer = normaliseText(answerText)
-  const commandWordMatch = question.match(
-    /\b(explain|compare|evaluate|describe|analyse|analyze|assess|calculate|justify|discuss|outline|state|identify|name|define|summarise|summarize)\b/i,
-  )
-  const commandWord = commandWordMatch?.[1]?.toLowerCase() ?? ''
+  const promptFamily = detectPromptFamily(question)
+  const commandWord = promptFamily?.id ?? ''
   const questionKeywords = Array.from(
     new Set(extractKeywords(question).filter((keyword) => keyword !== commandWord)),
   )
   const answerKeywords = new Set(extractKeywords(answer))
   const matchedKeywords = questionKeywords.filter((keyword) => answerKeywords.has(keyword))
   const missingKeywords = questionKeywords.filter((keyword) => !answerKeywords.has(keyword))
-  const commandWordExpectations = {
-    explain: /\b(because|therefore|as a result|this shows|which means|so)\b/i,
-    compare: /\b(both|whereas|while|however|similarly|in contrast|difference|similar)\b/i,
-    evaluate: /\b(overall|judgement|however|although|balance|more important|to a large extent)\b/i,
-    describe: /\b(there is|it is|shown by|has|contains|includes|features)\b/i,
-    analyse: /\b(because|therefore|suggests|implies|shows|leads to)\b/i,
-    analyze: /\b(because|therefore|suggests|implies|shows|leads to)\b/i,
-    assess: /\b(overall|judgement|however|although|balance|weigh|more effective)\b/i,
-    calculate: /\b(\d|=|×|÷|working|formula|equation|substitut|calculate|solve)\b/i,
-    justify: /\b(because|therefore|evidence|reason|supports)\b/i,
-    discuss: /\b(however|although|overall|both|on the other hand|balance)\b/i,
-    outline: /\b(briefly|overall|main point|mainly|in summary)\b/i,
-    state: /\b(shortly|simply|is|are|was|were|equals|=)\b/i,
-    identify: /\b(is|are|was|were|means|refers to|shows|represents)\b/i,
-    name: /\b(is|are|was|were|called|known as|named)\b/i,
-    define: /\b(means|refers to|is the|can be defined|defined as)\b/i,
-    summarise: /\b(in summary|overall|briefly|main point|short)\b/i,
-    summarize: /\b(in summary|overall|briefly|main point|short)\b/i,
-  }
-  const commandWordPattern =
-    commandWord ? commandWordExpectations[commandWord] ?? /\b(because|therefore|however|overall|working|formula|evidence)\b/i : null
-  const usesCommandStyle = commandWordPattern ? commandWordPattern.test(answer) : false
+  const usesCommandStyle = promptFamily ? promptFamily.responsePattern.test(answer) : false
   const keywordCoverage = questionKeywords.length ? matchedKeywords.length / questionKeywords.length : 0
 
   return {
@@ -123,6 +176,7 @@ function buildQuestionAnalysis(questionText, answerText) {
     matchedKeywords,
     missingKeywords,
     commandWord,
+    promptFamilyLabel: promptFamily?.label ?? '',
     usesCommandStyle,
     keywordCoverage,
   }
@@ -320,36 +374,29 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   }
 
   let score = 0
-  const hasMathSignals =
-    /\d/.test(text) ||
-    /[+\-*/=×÷^√→]/.test(text) ||
-    /\b(substitut(e|ion)|calculate|solve|working(?:\s+out)?|show(?:\s+your\s+work|(?:\s+working)?)?|step(?:s)?|equation|formula)\b/i.test(text)
   const hasVisibleCalculation = /[+\-*/=×÷^√→]/.test(text)
-  const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula)\b|→|=>/i.test(text)
+  const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate)\b|→|=>/i.test(text)
+  const hasWorkingTrail = lines.length >= 2 && (hasVisibleCalculation || hasProcessLanguage)
+  const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage
+  const hasFormulaReference = /\b(formula|equation|substitut(e|ion)|calculation|ratio|proportion|graph|table|method)\b/i.test(text)
   const hasUnits = /\b(cm|mm|kg|g|mol|dm\^?3|°c)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)
-  const hasConclusion = /\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)
-  const hasFormulaReference = /\b(formula|equation|substitut(e|ion)|calculation|ratio|proportion|graph|table)\b/i.test(text)
-  const hasConceptualDetail = /\b(force|energy|mass|velocity|acceleration|reaction|atom|cell|graph|ratio|probability|mean|median|area|volume|gradient|current|voltage|resistance|density|wave|frequency|temperature|power|percentage|speed|distance|time)\b/i.test(text)
+  const hasConclusion = /\b(therefore|because|so|hence|which means|final answer|in conclusion)\b/i.test(text)
+  const hasConceptualDetail = /\b(force|energy|mass|velocity|acceleration|reaction|atom|cell|graph|ratio|probability|mean|median|area|volume|gradient|current|voltage|resistance|density|wave|frequency|temperature|power|percentage|speed|distance|time|fraction|equation|function)\b/i.test(text)
+  const hasVerification = /\b(check|checked|verify|verified|recheck|sensible|reasonable|plausible|substitut(e|ion)\s+back|back-substitute|sanity check)\b/i.test(text)
+  const hasPromptFocus = questionAnalysis.questionKeywords.length
+    ? questionAnalysis.matchedKeywords.length >= 2 || questionAnalysis.keywordCoverage >= 0.35
+    : false
   const hasSustainedReasoning = text.length >= 100
 
-  if (lines.length >= 2 && hasMathSignals) {
+  if (hasWorkingTrail) {
     score += 2
     addMethodMark('You show more than one line of working, which is good evidence for method marks.')
-  } else if (hasMathSignals) {
+  } else if (hasMethodTrace) {
     score += 1
     addMethodMark('Show the steps you used, not just the final answer.')
-  } else {
-    addMethodMark('Use equations, substitutions, or calculation steps to earn method marks.')
-  }
-
-  if (hasVisibleCalculation) {
+  } else if (hasFormulaReference) {
     score += 1
-    addMethodMark('Your response includes visible calculation symbols, which can help show a working trail.')
-  }
-
-  if (hasProcessLanguage) {
-    score += 2
-    addMethodMark('Your response includes process language or a clear calculation trail.')
+    addMethodMark('You reference formulas, equations, or a calculation path, which helps show method.')
   } else {
     addMethodMark('Use equations, substitutions, or calculation steps to earn method marks.')
   }
@@ -366,34 +413,31 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
     addMethodMark('Detected markers for a conclusion or final answer, which is key for top marks.')
   }
 
-  if (hasFormulaReference) {
-    score += 1
-    addMethodMark('You reference formulas, equations, or a calculation path, which helps show method.')
-  }
-
   if (hasConceptualDetail) {
     score += 1
     addMethodMark('You include topic vocabulary or scientific context, which helps demonstrate understanding.')
   }
 
-  if (questionAnalysis.questionKeywords.length) {
-    const matchedSnippet = questionAnalysis.matchedKeywords.slice(0, 3).join(', ')
-    const missingSnippet = questionAnalysis.missingKeywords.slice(0, 3).join(', ')
+  if (hasVerification) {
+    score += 1
+    addMethodMark('You check or verify the result, which strengthens the method trail.')
+  }
 
-    if (questionAnalysis.matchedKeywords.length >= 2 || questionAnalysis.keywordCoverage >= 0.35) {
-      score += 1
-      addMethodMark(
-        matchedSnippet
-          ? `Question-aware check: you reuse key terms such as ${matchedSnippet}, which keeps the working on task.`
-          : 'Question-aware check: you reuse key terms from the prompt, which keeps the working on task.',
-      )
-    } else {
-      addMethodMark(
-        missingSnippet
-          ? `Question-aware check: use more of the prompt wording such as ${missingSnippet} so the method stays focused.`
-          : 'Question-aware check: use more of the prompt wording so the method stays focused.',
-      )
-    }
+  if (hasPromptFocus) {
+    score += 1
+    const matchedSnippet = questionAnalysis.matchedKeywords.slice(0, 3).join(', ')
+    addMethodMark(
+      matchedSnippet
+        ? `Question-aware check: you reuse key terms such as ${matchedSnippet}, which keeps the working on task.`
+        : 'Question-aware check: you reuse key terms from the prompt, which keeps the working on task.',
+    )
+  } else if (questionAnalysis.questionKeywords.length) {
+    const missingSnippet = questionAnalysis.missingKeywords.slice(0, 3).join(', ')
+    addMethodMark(
+      missingSnippet
+        ? `Question-aware check: use more of the prompt wording such as ${missingSnippet} so the method stays focused.`
+        : 'Question-aware check: use more of the prompt wording so the method stays focused.',
+    )
   }
 
   if (hasSustainedReasoning) {
