@@ -153,7 +153,7 @@ export default function App() {
     const normalizedEmail = normalizeEmail(email)
     const subscriptionsPath = normalizedEmail
       ? `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
-      : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=5'
+      : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200'
 
     const controller = new AbortController()
     subscriptionsControllerRef.current = controller
@@ -286,20 +286,6 @@ export default function App() {
   async function handleFileChange(file) {
     if (!file) return
 
-    const uploadRequestId = ++uploadRequestIdRef.current
-    const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
-    const questionTextVersionAtStart = questionTextVersionRef.current
-
-    if (workerRef.current) {
-      try {
-        await workerRef.current.terminate()
-      } catch (terminateErr) {
-        console.warn('Previous OCR worker could not be terminated:', terminateErr)
-      } finally {
-        workerRef.current = null
-      }
-    }
-
     const isImageType = Boolean(
       (file.type && file.type.startsWith('image/')) ||
         /\.(png|jpe?g|gif|webp|bmp|avif|heic|heif)$/i.test(file.name || ''),
@@ -317,8 +303,22 @@ export default function App() {
       return
     }
 
+    const uploadRequestId = ++uploadRequestIdRef.current
+    const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
+    const questionTextVersionAtStart = questionTextVersionRef.current
+
     if (uploadPreview) {
       URL.revokeObjectURL(uploadPreview)
+    }
+
+    if (workerRef.current) {
+      try {
+        await workerRef.current.terminate()
+      } catch (terminateErr) {
+        console.warn('Previous OCR worker could not be terminated:', terminateErr)
+      } finally {
+        workerRef.current = null
+      }
     }
 
     const nextPreview = URL.createObjectURL(file)
@@ -756,25 +756,25 @@ export default function App() {
               {markResult.ao1?.length ? (
                 <div>
                   <h3>AO1</h3>
-                  <ul>{markResult.ao1.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
+                  <ul>{markResult.ao1.map((item, index) => <li key={`${index}-${item.slice(0, 30)}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.ao2?.length ? (
                 <div>
                   <h3>AO2</h3>
-                  <ul>{markResult.ao2.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
+                  <ul>{markResult.ao2.map((item, index) => <li key={`${index}-${item.slice(0, 30)}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.ao3?.length ? (
                 <div>
                   <h3>AO3</h3>
-                  <ul>{markResult.ao3.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
+                  <ul>{markResult.ao3.map((item, index) => <li key={`${index}-${item.slice(0, 30)}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.extra?.length ? (
                 <div>
                   <h3>Method marks</h3>
-                  <ul>{markResult.extra.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
+                  <ul>{markResult.extra.map((item, index) => <li key={`${index}-${item.slice(0, 30)}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.storageError ? <p className="error">{markResult.storageError}</p> : null}
