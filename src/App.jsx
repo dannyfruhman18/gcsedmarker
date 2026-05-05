@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createWorker } from 'tesseract.js'
 import {
   APP_NAME,
@@ -61,8 +61,13 @@ export default function App() {
   const [subscriptionsError, setSubscriptionsError] = useState(null)
 
   const uploadRequestIdRef = useRef(0)
+  const sessionsRequestIdRef = useRef(0)
+  const subscriptionsRequestIdRef = useRef(0)
   const mountedRef = useRef(true)
   const requestControllersRef = useRef(new Set())
+  const sessionsControllerRef = useRef(null)
+  const subscriptionsControllerRef = useRef(null)
+  const configErrorLoggedRef = useRef(false)
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -70,35 +75,14 @@ export default function App() {
     [subscriptionEmail],
   )
 
-  useEffect(() => {
-    if (SUPABASE_CONFIG_ERROR) {
-      console.error(`${APP_NAME} configuration error: ${SUPABASE_CONFIG_ERROR}`)
+  const loadSessions = useCallback(async () => {
+    if (sessionsControllerRef.current) {
+      sessionsControllerRef.current.abort()
     }
-  }, [])
 
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false
-      requestControllersRef.current.forEach((controller) => controller.abort())
-      requestControllersRef.current.clear()
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (uploadPreview) {
-        URL.revokeObjectURL(uploadPreview)
-      }
-    }
-  }, [uploadPreview])
-
-  useEffect(() => {
-    void loadSessions()
-    void loadSubscriptions()
-  }, [])
-
-  async function loadSessions() {
+    const requestId = ++sessionsRequestIdRef.current
     const controller = new AbortController()
+    sessionsControllerRef.current = controller
     requestControllersRef.current.add(controller)
 
     setSessionsError(null)
@@ -118,34 +102,49 @@ export default function App() {
         controller.signal,
       )
       const nextRows = Array.isArray(rows) ? rows : []
-      if (!mountedRef.current || controller.signal.aborted) return nextRows
+      if (
+        !mountedRef.current ||
+        controller.signal.aborted ||
+        requestId !== sessionsRequestIdRef.current
+      ) {
+        return nextRows
+      }
 
       setRecentSessions(nextRows)
       setSessionsError(null)
       return nextRows
     } catch (err) {
-      if (controller.signal.aborted) return []
+      if (controller.signal.aborted || requestId !== sessionsRequestIdRef.current) return []
 
-      console.error(err)
+      console.error('Could not load recent marking sessions:', err)
       if (mountedRef.current) {
         setSessionsError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
       }
       return []
     } finally {
       requestControllersRef.current.delete(controller)
-      if (mountedRef.current && !controller.signal.aborted) {
+      if (sessionsControllerRef.current === controller) {
+        sessionsControllerRef.current = null
+      }
+      if (mountedRef.current && !controller.signal.aborted && requestId === sessionsRequestIdRef.current) {
         setLoadingSessions(false)
       }
     }
-  }
+  }, [])
 
-  async function loadSubscriptions(email = '') {
+  const loadSubscriptions = useCallback(async (email = '') => {
+    if (subscriptionsControllerRef.current) {
+      subscriptionsControllerRef.current.abort()
+    }
+
+    const requestId = ++subscriptionsRequestIdRef.current
     const normalizedEmail = normalizeEmail(email)
     const subscriptionsPath = normalizedEmail
       ? `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
       : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=5'
 
     const controller = new AbortController()
+    subscriptionsControllerRef.current = controller
     requestControllersRef.current.add(controller)
 
     setSubscriptionsError(null)
@@ -165,29 +164,83 @@ export default function App() {
         controller.signal,
       )
       const nextRows = Array.isArray(rows) ? rows : []
-      if (!mountedRef.current || controller.signal.aborted) return nextRows
+      if (
+        !mountedRef.current ||
+        controller.signal.aborted ||
+        requestId !== subscriptionsRequestIdRef.current
+      ) {
+        return nextRows
+      }
 
       setRecentSubscriptions(nextRows)
       setSubscriptionsError(null)
       return nextRows
     } catch (err) {
-      if (controller.signal.aborted) return null
+      if (controller.signal.aborted || requestId !== subscriptionsRequestIdRef.current) return null
 
-      console.error(err)
+      console.error('Could not load recent subscriptions:', err)
       if (mountedRef.current) {
         setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
       }
       return null
     } finally {
       requestControllersRef.current.delete(controller)
-      if (mountedRef.current && !controller.signal.aborted) {
+      if (subscriptionsControllerRef.current === controller) {
+        subscriptionsControllerRef.current = null
+      }
+      if (
+        mountedRef.current &&
+        !controller.signal.aborted &&
+        requestId === subscriptionsRequestIdRef.current
+      ) {
         setLoadingSubscriptions(false)
       }
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (SUPABASE_CONFIG_ERROR && !configErrorLoggedRef.current) {
+      configErrorLoggedRef.current = true
+      console.error(`${APP_NAME} configuration error: ${SUPABASE_CONFIG_ERROR}`)
+    }
+  }, [SUPABASE_CONFIG_ERROR])
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+      sessionsControllerRef.current?.abort()
+      subscriptionsControllerRef.current?.abort()
+      requestControllersRef.current.forEach((controller) => controller.abort())
+      requestControllersRef.current.clear()
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (uploadPreview) {
+        URL.revokeObjectURL(uploadPreview)
+      }
+    }
+  }, [uploadPreview])
+
+  useEffect(() => {
+    void loadSessions()
+    void loadSubscriptions()
+  }, [loadSessions, loadSubscriptions])
 
   async function handleFileChange(file) {
     if (!file) return
+
+    const uploadRequestId = ++uploadRequestIdRef.current
+    const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
+    const clearUploadState = () => {
+      if (uploadPreview) {
+        URL.revokeObjectURL(uploadPreview)
+      }
+      setUploadName('')
+      setUploadPreview('')
+      setOcrLoading(false)
+    }
 
     const isImageType = Boolean(
       (file.type && file.type.startsWith('image/')) ||
@@ -195,27 +248,16 @@ export default function App() {
     )
 
     if (!isImageType) {
-      if (uploadPreview) {
-        URL.revokeObjectURL(uploadPreview)
-      }
-      setUploadName('')
-      setUploadPreview('')
+      clearUploadState()
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
     }
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      if (uploadPreview) {
-        URL.revokeObjectURL(uploadPreview)
-      }
-      setUploadName('')
-      setUploadPreview('')
+      clearUploadState()
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
     }
-
-    const uploadRequestId = ++uploadRequestIdRef.current
-    const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
 
     if (uploadPreview) {
       URL.revokeObjectURL(uploadPreview)
@@ -229,7 +271,11 @@ export default function App() {
     setOcrStatus('Reading text from the image...')
 
     try {
-      const extracted = await extractQuestionTextFromImage(file, setOcrStatus)
+      const extracted = await extractQuestionTextFromImage(file, (status) => {
+        if (mountedRef.current && isLatestUpload()) {
+          setOcrStatus(status)
+        }
+      })
       if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
@@ -241,7 +287,7 @@ export default function App() {
     } catch (err) {
       if (!mountedRef.current || !isLatestUpload()) return
 
-      console.error(err)
+      console.error('OCR failed while reading uploaded question:', err)
       setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
     } finally {
       if (isLatestUpload() && mountedRef.current) {
@@ -420,7 +466,7 @@ export default function App() {
         stripeWindow.location.href = STRIPE_PAYMENT_LINK
       }
 
-      await loadSubscriptions(normalizedSubscriptionEmail)
+      await loadSubscriptions(email)
       if (!mountedRef.current) return
 
       setError(null)

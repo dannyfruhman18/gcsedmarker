@@ -45,6 +45,7 @@ a:hover { text-decoration: underline; }
 img, video {
   display: block;
   max-width: 100%;
+  height: auto;
 }
 button, select, textarea, input {
   font: inherit;
@@ -278,6 +279,11 @@ textarea { resize: vertical; min-height: 110px; }
 }
 .result-score strong { font-size: 2.4rem; }
 .result-score span { color: var(--color-text-muted); }
+.result-card p,
+.resource-box a,
+.tier-card p {
+  overflow-wrap: anywhere;
+}
 .result-card h3 {
   margin: 0 0 6px;
   font-size: 1rem;
