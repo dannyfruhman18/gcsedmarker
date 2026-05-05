@@ -118,7 +118,6 @@ h1 {
 }
 .panel-header {
   display: flex;
-  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
@@ -240,10 +239,10 @@ textarea { resize: vertical; min-height: 110px; }
   gap: 10px;
 }
 .history-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
+  display: flex;
+  justify-content: space-between;
   align-items: flex-start;
+  gap: 12px;
   padding: 14px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
@@ -348,4 +347,16 @@ textarea { resize: vertical; min-height: 110px; }
   .stat {
     padding: 10px 12px;
   }
+}
+
+:focus-visible {
+  outline: 2px solid #8ec5ff;
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  box-shadow: 0 0 0 4px rgba(142, 197, 255, 0.25);
 }
