@@ -396,8 +396,7 @@ export default function App() {
 
       if (extracted) {
         const extractedWordCount = extracted.split(/\s+/).filter(Boolean).length
-        if (questionTextRefe
-rence.current === questionTextVersionAtStart) {
+        if (questionTextVersionRef.current === questionTextVersionAtStart) {
           setQuestionText(extracted)
           setOcrStatus(`Text read from image (${extractedWordCount} words).`)
         } else {
