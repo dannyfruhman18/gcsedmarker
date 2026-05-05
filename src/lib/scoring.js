@@ -324,7 +324,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
     /\d/.test(text) ||
     /[+\-*/=×÷^√→]/.test(text) ||
     /\b(substitut(e|ion)|calculate|solve|working(?:\s+out)?|show(?:\s+your\s+work|(?:\s+working)?)?|step(?:s)?|equation|formula)\b/i.test(text)
-  const hasVisibleCalculation = /[+\-*/=×÷^√→]/.test(text)
+  const hasVisibleCalculation = /\d+[\s\+\-\*\/\=]+\d+/.test(answerText)
   const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula)\b|→|=>/i.test(text)
   const hasUnits = /\b(cm|mm|kg|g|mol|dm\^?3|°c)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)
   const hasConclusion = /\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)
