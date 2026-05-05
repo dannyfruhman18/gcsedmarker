@@ -8,8 +8,11 @@ import {
 export function safeParseJson(text) {
   if (!text) return null
 
+  const normalizedText = String(text).trim()
+  if (!normalizedText) return null
+
   try {
-    return JSON.parse(text)
+    return JSON.parse(normalizedText)
   } catch {
     return text
   }
@@ -59,15 +62,21 @@ export async function supabaseRequest(path, options = {}, signal) {
     throw new Error(SUPABASE_CONFIG_ERROR)
   }
 
+  const hasBody = options.body !== undefined && options.body !== null
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    ...options.headers,
+  }
+
+  if (hasBody && !('Content-Type' in headers) && !('content-type' in headers)) {
+    headers['Content-Type'] = 'application/json'
+  }
+
   const response = await fetch(`${SUPABASE_BASE_URL}${path}`, {
     ...options,
     signal: signal ?? options.signal,
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   })
 
   const text = await response.text()
