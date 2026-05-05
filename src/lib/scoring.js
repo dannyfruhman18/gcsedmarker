@@ -1,9 +1,28 @@
-export function scoreEssay(answer, topBand) {
+function getBoardSpecificFeedback(board, mode) {
+  switch (board) {
+    case 'AQA':
+      return mode === 'essay'
+        ? 'AQA focus on AO2 structure: keep each paragraph tightly linked to the question.'
+        : 'AQA focus on method: show each calculation step clearly and label your working.'
+    case 'Edexcel':
+      return mode === 'essay'
+        ? 'Edexcel evaluation requirement: make your judgement explicit and supported by evidence.'
+        : 'Edexcel focus on method marks: keep substitutions and calculations easy to follow.'
+    case 'OCR':
+      return mode === 'essay'
+        ? 'OCR focus: balance evidence, explanation, and judgement across your response.'
+        : 'OCR focus on accuracy: show the working trail and include the final conclusion clearly.'
+    default:
+      return 'Keep your response aligned to the question and show your reasoning clearly.'
+  }
+}
+
+export function scoreEssay(answer, topBand, board = 'AQA') {
   const text = typeof answer === 'string' ? answer.trim() : ''
 
   if (!text) {
     return {
-      maxMarks: topBand ? 4 : 3,
+      maxMarks: 6,
       score: 0,
       ao1: ['You are ready to start — paste a student response and we will help shape it into stronger AO1 evidence.'],
       ao2: ['Even a short answer is enough to begin; adding more detail will unlock clearer AO2 feedback.'],
@@ -35,6 +54,11 @@ export function scoreEssay(answer, topBand) {
     ao2.push('Develop analysis by explaining how and why the evidence matters.')
   }
 
+  const boardSpecificFeedback = getBoardSpecificFeedback(board, 'essay')
+  if (boardSpecificFeedback) {
+    ao2.push(boardSpecificFeedback)
+  }
+
   if (/\b(however|although|overall|on the other hand|ultimately|to a large extent|judgement)\b/i.test(text)) {
     ao3.push('There is some evaluation or judgement, which helps the top bands.')
     score += 1
@@ -60,8 +84,8 @@ export function scoreEssay(answer, topBand) {
   }
 
   return {
-    maxMarks: topBand ? 4 : 3,
-    score: Math.min(score, topBand ? 4 : 3),
+    maxMarks: 6,
+    score: Math.min(score, 6),
     ao1,
     ao2,
     ao3,
@@ -73,12 +97,12 @@ export function scoreEssay(answer, topBand) {
   }
 }
 
-export function scoreMathsScience(answer, topBand) {
+export function scoreMathsScience(answer, topBand, board = 'AQA') {
   const text = typeof answer === 'string' ? answer.trim() : ''
 
   if (!text) {
     return {
-      maxMarks: topBand ? 5 : 4,
+      maxMarks: 10,
       score: 0,
       ao1: ['You are ready to begin — paste the working or final answer and we will help identify the method marks.'],
       ao2: ['A few steps are enough to start; adding them will make the process feedback more precise.'],
@@ -131,6 +155,11 @@ export function scoreMathsScience(answer, topBand) {
     addMethodMark('Include units where needed and keep the final answer contextualised.')
   }
 
+  const boardSpecificFeedback = getBoardSpecificFeedback(board, 'maths_science')
+  if (boardSpecificFeedback) {
+    addMethodMark(boardSpecificFeedback)
+  }
+
   if (/\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)) {
     marks.add('conclusion')
     addMethodMark('Detected markers for a conclusion or final answer, which is key for top marks.')
@@ -141,10 +170,10 @@ export function scoreMathsScience(answer, topBand) {
     addMethodMark('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
   }
 
-  const score = Math.min(marks.size, topBand ? 5 : 4)
+  const score = Math.min(marks.size, 10)
 
   return {
-    maxMarks: topBand ? 5 : 4,
+    maxMarks: 10,
     score,
     ao1: ['Method marks are awarded for the steps, working, and correct structure you show.'],
     ao2: ['Explain each step clearly, especially when moving from formula to substitution to answer.'],

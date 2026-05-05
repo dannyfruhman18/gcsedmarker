@@ -26,8 +26,22 @@ async function extractQuestionTextFromImage(file, onProgress, worker) {
     throw new Error('OCR worker is not available.')
   }
 
+  if (typeof onProgress === 'function') {
+    onProgress('Preparing OCR...')
+  }
+
   const result = await worker.recognize(file)
-  return result?.data?.text?.trim() ?? ''
+  const extractedText = result?.data?.text?.trim() ?? ''
+
+  if (typeof onProgress === 'function') {
+    onProgress(
+      extractedText
+        ? 'OCR complete.'
+        : 'No clear text found. You can type or paste the question manually.',
+    )
+  }
+
+  return extractedText
 }
 
 export default function App() {
@@ -297,7 +311,7 @@ export default function App() {
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
       clearUpload()
-      setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
+      setOcrStatus('File is too large. Please upload an image smaller than 5MB.').
       return
     }
 
@@ -316,7 +330,17 @@ export default function App() {
     try {
       worker = await createWorker('eng', 1, {
         logger: (message) => {
-          if (message?.status && mountedRef.current && isLatestUpload()) {
+          if (!mountedRef.current || !isLatestUpload()) {
+            return
+          }
+
+          if (typeof message?.progress === 'number') {
+            const percent = Math.max(0, Math.min(100, Math.round(message.progress * 100)))
+            setOcrStatus(`OCR: ${percent}%`)
+            return
+          }
+
+          if (message?.status) {
             setOcrStatus(`OCR: ${message.status}`)
           }
         },
@@ -332,15 +356,7 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
-        setQuestionText((currentText) => {
-          const existingText = currentText.trim()
-          const extractedText = extracted.trim()
-
-          if (!existingText) return extractedText
-          if (!extractedText) return currentText
-
-          return `${existingText}\n\n${extractedText}`
-        })
+        setQuestionText(extracted)
         setOcrStatus(`Text read from image (${extracted.split(/\s+/).filter(Boolean).length} words).`)
       } else {
         setOcrStatus('No clear text found. You can type or paste the question manually.')
@@ -420,7 +436,7 @@ export default function App() {
           setError(message)
           setMarkResult({
             score: 0,
-            maxMarks: topBand ? 5 : 4,
+            maxMarks: topBand ? 6 : 6,
             summary: message,
             ao1: ['We could not confirm subscription access just now. Please refresh status and try again.'],
             ao2: [],
@@ -438,7 +454,7 @@ export default function App() {
         if (mountedRef.current) {
           setMarkResult({
             score: 0,
-            maxMarks: topBand ? 5 : 4,
+            maxMarks: topBand ? 6 : 6,
             summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.',
             ao1: ['This workspace is currently configured to require an active subscription before marking.'],
             ao2: [],
@@ -449,7 +465,7 @@ export default function App() {
       }
 
       const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
-      const result = analyzer(answerText, topBand)
+      const result = analyzer(answerText, topBand, board)
       if (!mountedRef.current) return
       setMarkResult(result)
 
