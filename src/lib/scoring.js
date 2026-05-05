@@ -104,7 +104,7 @@ export function scoreMathsScience(answer, topBand) {
     methodMarks.push('You are off to a good start — add your working or final answer to unlock feedback.')
   }
 
-  if (/=|→|=>|\bsubstitut(e|ion)\b|\bcalculate\b|\bshow\b/i.test(text)) {
+  if (/\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?)\b|→|=>/i.test(text)) {
     marks.add('process')
     methodMarks.push('Your response includes process language or a clear calculation trail.')
   } else {

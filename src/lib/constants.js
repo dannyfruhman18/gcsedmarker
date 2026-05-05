@@ -17,7 +17,6 @@ export const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
   'trialing',
   'paid',
   'past_due',
-  'pending_payment',
 ])
 export const MAX_VISIBLE_HISTORY_ROWS = 5
 
