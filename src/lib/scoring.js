@@ -26,8 +26,6 @@ export function scoreEssay(answer, topBand) {
     score += 1
   } else if (length > 0) {
     ao1.push('Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
-  } else {
-    ao1.push('You have a good starting point — add factual detail and examples to build your answer.')
   }
 
   if (/\b(because|therefore|this shows|consequently|as a result|proves|suggests)\b/i.test(text)) {
@@ -95,14 +93,23 @@ export function scoreMathsScience(answer, topBand) {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
   const methodMarks = []
   const marks = new Set()
+  const hasMathSignals =
+    /\d/.test(text) ||
+    /[+\-*/=×÷^√→]/.test(text) ||
+    /\b(substitut(e|ion)|calculate|solve|working(?:\s+out)?|show(?:\s+your\s+work|(?:\s+working)?)?|step(?:s)?|equation|formula)\b/i.test(text)
+  const hasVisibleCalculation = /[+\-*/=×÷^√→]/.test(text)
 
-  if (lines.length >= 2) {
+  if (lines.length >= 2 && hasMathSignals) {
     marks.add('working')
     methodMarks.push('You show more than one line of working, which is good evidence for method marks.')
-  } else if (text) {
+  } else if (hasMathSignals) {
     methodMarks.push('Show the steps you used, not just the final answer.')
+    if (hasVisibleCalculation) {
+      marks.add('working')
+      methodMarks.push('Your response includes visible calculation symbols, which can count as working if the chain of reasoning is clear.')
+    }
   } else {
-    methodMarks.push('You are off to a good start — add your working or final answer to unlock feedback.')
+    methodMarks.push('Use equations, substitutions, or calculation steps to earn method marks.')
   }
 
   if (/\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?)\b|→|=>/i.test(text)) {
