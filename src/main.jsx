@@ -601,7 +601,7 @@ function App() {
 
           <div className="dropzone">
             <input id="upload" type="file" accept="image/*" onChange={(e) => void handleFileChange(e.target.files?.[0])} />
-            <label htmlFor="upload">
+            <label htmlFor="upload" className="upload-button">
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
             </label>

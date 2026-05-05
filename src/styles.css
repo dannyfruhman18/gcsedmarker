@@ -156,8 +156,22 @@ select, textarea, input[type='email'] {
 .dropzone input[type='file'] {
   display: none;
 }
+.upload-button {
+  cursor: pointer;
+  padding: 24px;
+  border: 2px dashed rgba(142, 197, 255, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+  transition: all 0.2s ease;
+}
+.upload-button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(142, 197, 255, 0.4);
+}
 textarea { resize: vertical; min-height: 110px; }
 .toggle {
+  cursor: pointer;
   align-self: end;
   display: flex;
   align-items: center;
