@@ -187,7 +187,7 @@ function scoreMathsScience(answer, topBand) {
     methodMarks.push('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
   }
 
-  const score = Math.min(marks.size + (topBand && text.length >= 100 ? 1 : 0), topBand ? 5 : 4)
+  const score = Math.min(marks.size, topBand ? 5 : 4)
 
   return {
     maxMarks: topBand ? 5 : 4,
@@ -290,7 +290,8 @@ function App() {
 
   async function loadSubscriptions(email = '') {
     try {
-      const emailFilter = email ? `&email=eq.${encodeURIComponent(email)}` : ''
+      const normalizedEmail = String(email ?? '').trim().toLowerCase()
+      const emailFilter = normalizedEmail ? `&email=eq.${encodeURIComponent(normalizedEmail)}` : ''
       // TODO: Query subscriptions by email/status on the server instead of loading a broad recent history for better scale.
       const rows = await supabaseRequest(
         `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200${emailFilter}`,
@@ -408,7 +409,7 @@ function App() {
   }
 
   async function handleSubscription() {
-    const email = subscriptionEmail.trim()
+    const email = subscriptionEmail.trim().toLowerCase()
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setSubscriptionResult('Add a valid email address.')
       return
