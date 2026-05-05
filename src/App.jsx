@@ -223,15 +223,13 @@ export default function App() {
     )
   }, [loadSubscriptions, normalizedSubscriptionEmail])
 
-  const clearUpload = useCallback(() => {
+  const clearUploadState = useCallback(() => {
     if (uploadPreview) {
       URL.revokeObjectURL(uploadPreview)
     }
 
-    uploadRequestIdRef.current += 1
     setUploadName('')
     setUploadPreview('')
-    setOcrStatus('Upload an image and OCR will fill the question box.')
     setOcrLoading(false)
   }, [uploadPreview])
 
@@ -281,13 +279,13 @@ export default function App() {
     )
 
     if (!isImageType) {
-      clearUpload()
+      clearUploadState()
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
     }
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      clearUpload()
+      clearUploadState()
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
     }
@@ -311,17 +309,7 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
-        setQuestionText((currentText) => {
-          const existingText = currentText.trim()
-          const extractedText = extracted.trim()
-
-          if (!existingText) return extractedText
-          if (!extractedText) return currentText
-
-          return `${existingText}
-
-${extractedText}`
-        })
+        setQuestionText(extracted)
         setOcrStatus(`Text read from image (${extracted.split(/\s+/).filter(Boolean).length} words).`)
       } else {
         setOcrStatus('No clear text found. You can type or paste the question manually.')
@@ -330,6 +318,7 @@ ${extractedText}`
       if (!mountedRef.current || !isLatestUpload()) return
 
       console.error('OCR failed while reading uploaded question:', err)
+      setQuestionText('')
       setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
     } finally {
       if (isLatestUpload() && mountedRef.current) {
@@ -622,19 +611,7 @@ ${extractedText}`
               <span>JPG, PNG, or camera image</span>
             </label>
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <p className="muted" style={{ margin: 0, flex: '1 1 220px' }}>{ocrStatus}</p>
-              {uploadPreview ? (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={clearUpload}
-                  style={{ width: 'auto', marginTop: 0, padding: '8px 12px' }}
-                >
-                  Clear
-                </button>
-              ) : null}
-            </div>
+            <p className="muted">{ocrStatus}</p>
             {uploadPreview ? <img className="preview" src={uploadPreview} alt="Uploaded question preview" /> : null}
           </div>
 

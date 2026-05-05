@@ -92,6 +92,11 @@ export function scoreMathsScience(answer, topBand) {
 
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
   const methodMarks = []
+  const addMethodMark = (message) => {
+    if (!methodMarks.includes(message)) {
+      methodMarks.push(message)
+    }
+  }
   const marks = new Set()
   const hasMathSignals =
     /\d/.test(text) ||
@@ -101,39 +106,39 @@ export function scoreMathsScience(answer, topBand) {
 
   if (lines.length >= 2 && hasMathSignals) {
     marks.add('working')
-    methodMarks.push('You show more than one line of working, which is good evidence for method marks.')
+    addMethodMark('You show more than one line of working, which is good evidence for method marks.')
   } else if (hasMathSignals) {
-    methodMarks.push('Show the steps you used, not just the final answer.')
+    addMethodMark('Show the steps you used, not just the final answer.')
     if (hasVisibleCalculation) {
       marks.add('working')
-      methodMarks.push('Your response includes visible calculation symbols, which can count as working if the chain of reasoning is clear.')
+      addMethodMark('Your response includes visible calculation symbols, which can count as working if the chain of reasoning is clear.')
     }
   } else {
-    methodMarks.push('Use equations, substitutions, or calculation steps to earn method marks.')
+    addMethodMark('Use equations, substitutions, or calculation steps to earn method marks.')
   }
 
   if (/\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?)\b|→|=>/i.test(text)) {
     marks.add('process')
-    methodMarks.push('Your response includes process language or a clear calculation trail.')
+    addMethodMark('Your response includes process language or a clear calculation trail.')
   } else {
-    methodMarks.push('Use equations, substitutions, or calculation steps to earn method marks.')
+    addMethodMark('Use equations, substitutions, or calculation steps to earn method marks.')
   }
 
   if (/\b(cm|mm|kg|g|mol|dm\^?3|°c)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)) {
     marks.add('units')
-    methodMarks.push('You have included units or scientific measurement language.')
+    addMethodMark('You have included units or scientific measurement language.')
   } else {
-    methodMarks.push('Include units where needed and keep the final answer contextualised.')
+    addMethodMark('Include units where needed and keep the final answer contextualised.')
   }
 
   if (/\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)) {
     marks.add('conclusion')
-    methodMarks.push('Detected markers for a conclusion or final answer, which is key for top marks.')
+    addMethodMark('Detected markers for a conclusion or final answer, which is key for top marks.')
   }
 
   if (topBand && text.length >= 100) {
     marks.add('topband')
-    methodMarks.push('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
+    addMethodMark('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
   }
 
   const score = Math.min(marks.size, topBand ? 5 : 4)

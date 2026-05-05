@@ -209,10 +209,8 @@ select, textarea, input[type='email'] {
   color: var(--color-text);
   padding: 12px 14px;
 }
-.dropzone input[type='file'].visually-hidden:focus-visible + .upload-button,
-.dropzone input[type='file'].visually-hidden:focus + .upload-button {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+.dropzone input[type='file'] {
+  display: none;
 }
 .upload-button {
   cursor: pointer;
@@ -446,6 +444,15 @@ textarea { resize: vertical; min-height: 110px; }
 
   .stat {
     padding: 10px 12px;
+  }
+}
+@media (max-width: 320px) {
+  .hero h1 {
+    font-size: 1.28rem;
+  }
+
+  .stat strong {
+    font-size: 0.94rem;
   }
 }
 
