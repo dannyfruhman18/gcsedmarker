@@ -195,11 +195,21 @@ export default function App() {
     )
 
     if (!isImageType) {
+      if (uploadPreview) {
+        URL.revokeObjectURL(uploadPreview)
+      }
+      setUploadName('')
+      setUploadPreview('')
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
     }
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      if (uploadPreview) {
+        URL.revokeObjectURL(uploadPreview)
+      }
+      setUploadName('')
+      setUploadPreview('')
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
     }
@@ -346,6 +356,7 @@ export default function App() {
       setError(null)
       await loadSessions()
     } catch (err) {
+      console.error('Marking answer failed:', err)
       if (!mountedRef.current) return
 
       const message = `Supabase save failed. Check VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, network connectivity, and Supabase RLS or table permissions for marking_sessions/subscriptions. Original error: ${err?.message || String(err)}`
@@ -421,6 +432,7 @@ export default function App() {
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.',
       )
     } catch (err) {
+      console.error('Subscription save failed:', err)
       if (stripeWindow && !stripeWindow.closed) {
         stripeWindow.close()
       }
@@ -564,25 +576,25 @@ export default function App() {
               {markResult.ao1?.length ? (
                 <div>
                   <h3>AO1</h3>
-                  <ul>{markResult.ao1.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <ul>{markResult.ao1.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.ao2?.length ? (
                 <div>
                   <h3>AO2</h3>
-                  <ul>{markResult.ao2.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <ul>{markResult.ao2.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.ao3?.length ? (
                 <div>
                   <h3>AO3</h3>
-                  <ul>{markResult.ao3.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <ul>{markResult.ao3.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.extra?.length ? (
                 <div>
                   <h3>Method marks</h3>
-                  <ul>{markResult.extra.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <ul>{markResult.extra.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.storageError ? <p className="error">{markResult.storageError}</p> : null}
