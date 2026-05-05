@@ -9,7 +9,7 @@
 html, body, #root { min-height: 100dvh; }
 body {
   margin: 0;
-  height: 100dvh;
+  min-height: 100dvh;
   background: linear-gradient(180deg, #07111f 0%, #091423 100%);
 }
 a { color: #8ec5ff; text-decoration: none; }
@@ -27,7 +27,7 @@ button:disabled:hover {
 .app-shell {
   width: min(100%, 900px);
   min-height: 100dvh;
-  height: 100dvh;
+  height: auto;
   margin: 0 auto;
   padding: 20px 14px 40px;
 }
