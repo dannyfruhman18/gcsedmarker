@@ -19,8 +19,6 @@ if (SUPABASE_CONFIG_ERROR) {
   )
 }
 
-console.log('GCSEmarker Supabase URL:', SUPABASE_URL)
-
 const BOARD_LINKS = {
   AQA: {
     label: 'AQA past papers and mark schemes',
@@ -89,20 +87,6 @@ function subscriptionHasActiveAccess(rows, email) {
   return rows.some((row) => normalizeEmail(row?.email) === normalizedEmail && isActiveSubscriptionRow(row))
 }
 
-function mergeHistoryRows(existingRows, incomingRows) {
-  const mergedRows = new Map()
-  for (const row of [...(Array.isArray(existingRows) ? existingRows : []), ...(Array.isArray(incomingRows) ? incomingRows : [])]) {
-    if (!row || row.id == null) continue
-    mergedRows.set(row.id, row)
-  }
-
-  return Array.from(mergedRows.values()).sort((a, b) => {
-    const aTime = new Date(a?.created_at || 0).getTime()
-    const bTime = new Date(b?.created_at || 0).getTime()
-    return bTime - aTime
-  })
-}
-
 function formatDateTime(value) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? 'Unknown date' : date.toLocaleString()
@@ -127,7 +111,7 @@ async function supabaseRequest(path, options = {}) {
   const data = safeParseJson(text)
 
   if (!response.ok) {
-    const message =
+    const message=
       typeof data === 'string'
         ? data
         : data?.message || data?.error_description || data?.hint || response.statusText
