@@ -148,6 +148,7 @@ function scoreEssay(answer, topBand) {
   }
 
   const length = text.split(/\s+/).filter(Boolean).length
+  const paragraphBreaks = (text.match(/\n\s*\n/g) ?? []).length
   const ao1 = []
   const ao2 = []
   const ao3 = []
@@ -176,10 +177,20 @@ function scoreEssay(answer, topBand) {
     ao3.push('Add a clear judgement or comparison to reach stronger AO3 levels.')
   }
 
+  if (paragraphBreaks >= 2) {
+    ao3.push('Good paragraph structure identified.')
+  } else {
+    ao3.push('Consider using paragraph breaks to improve the structure of your essay.')
+  }
+
   if (topBand) {
-    ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
-    ao2.push('Top Band mode: use linked chains of reasoning and compare alternatives instead of listing points.')
-    ao3.push('Structural signal placeholder: check for paragraphing, counterargument, and conclusion flow here instead of using raw word count.')
+    if (length > 150) {
+      ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
+      ao2.push('Top Band mode: use linked chains of reasoning and compare alternatives instead of listing points.')
+      ao3.push('Top Band mode: refine paragraph sequencing, counterargument, and conclusion flow to maximise impact.')
+    } else {
+      ao3.push('Top Band feedback unlocks best when the essay is more fully developed (over 150 words). Add more detail and evaluation to push into the top band.')
+    }
   }
 
   return {
@@ -189,7 +200,9 @@ function scoreEssay(answer, topBand) {
     ao2,
     ao3,
     summary: topBand
-      ? 'Grade 9 / Top Band focus: make every paragraph precise, conceptual, and evaluative.'
+      ? length > 150
+        ? 'Grade 9 / Top Band focus: make every paragraph precise, conceptual, and evaluative.'
+        : 'Top Band mode is on, but this response needs more development (over 150 words) before full top-band feedback applies.'
       : 'Focus on specific knowledge, explanation, and a clear conclusion.',
   }
 }
@@ -293,7 +306,7 @@ function App() {
   const [recentSubscriptions, setRecentSubscriptions] = useState([])
   const [loadingSessions, setLoadingSessions] = useState(false)
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [marking, setMarking] = useState(false)
   const [subscriptionEmail, setSubscriptionEmail] = useState('')
   const [subscriptionPlan, setSubscriptionPlan] = useState('top-band')
   const [subscriptionResult, setSubscriptionResult] = useState('')
@@ -519,7 +532,7 @@ function App() {
       return
     }
 
-    setSaving(true)
+    setMarking(true)
     try {
       const refreshedSubscriptions = hasSubscriptionEmail
         ? await loadSubscriptions(normalizedMarkEmail)
@@ -588,7 +601,7 @@ function App() {
     } catch (err) {
       if (!mountedRef.current) return
 
-      const message = `Supabase save failed: ${err?.message || String(err)}`
+      const message = `Supabase save failed. Check VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, network connectivity, and Supabase RLS or table permissions for marking_sessions/subscriptions. Original error: ${err?.message || String(err)}`
       setError(message)
       setMarkResult((current) => ({
         ...(current || {}),
@@ -596,7 +609,7 @@ function App() {
       }))
     } finally {
       if (mountedRef.current) {
-        setSaving(false)
+        setMarking(false)
       }
     }
   }
@@ -777,8 +790,8 @@ function App() {
             </label>
           </div>
 
-          <button className="primary" onClick={handleMark} disabled={saving || ocrLoading}>
-            {saving ? 'Saving...' : 'Mark answer'}
+          <button className="primary" onClick={handleMark} disabled={marking || ocrLoading}>
+            {marking ? 'Marking...' : 'Mark answer'}
           </button>
         </section>
 
