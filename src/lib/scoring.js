@@ -1,3 +1,133 @@
+const QUESTION_STOPWORDS = new Set([
+  'about',
+  'after',
+  'again',
+  'also',
+  'because',
+  'being',
+  'between',
+  'both',
+  'could',
+  'during',
+  'each',
+  'even',
+  'from',
+  'into',
+  'made',
+  'make',
+  'more',
+  'most',
+  'much',
+  'must',
+  'only',
+  'other',
+  'over',
+  'some',
+  'such',
+  'than',
+  'that',
+  'then',
+  'there',
+  'their',
+  'them',
+  'these',
+  'they',
+  'this',
+  'those',
+  'through',
+  'using',
+  'what',
+  'when',
+  'where',
+  'which',
+  'while',
+  'with',
+  'within',
+  'would',
+  'your',
+  'yours',
+  'you',
+  'answer',
+  'question',
+  'prompt',
+])
+
+function normaliseText(value) {
+  return String(value ?? '').trim()
+}
+
+function extractKeywords(text) {
+  const words = normaliseText(text).toLowerCase().match(/\b[a-z]{4,}\b/g) ?? []
+  return words.filter((word) => !QUESTION_STOPWORDS.has(word))
+}
+
+function normalizeScoringOptions(input, legacyTopBand, legacyBoard = 'AQA') {
+  if (input && typeof input === 'object' && !Array.isArray(input)) {
+    return {
+      questionText: input.questionText ?? '',
+      answerText: input.answerText ?? '',
+      topBand: Boolean(input.topBand),
+      board: input.board || 'AQA',
+    }
+  }
+
+  return {
+    questionText: '',
+    answerText: input ?? '',
+    topBand: Boolean(legacyTopBand),
+    board: legacyBoard || 'AQA',
+  }
+}
+
+function buildQuestionAnalysis(questionText, answerText) {
+  const question = normaliseText(questionText)
+  const answer = normaliseText(answerText)
+  const commandWordMatch = question.match(
+    /\b(explain|compare|evaluate|describe|analyse|analyze|assess|calculate|justify|discuss|outline|state|identify|name|define|summarise|summarize)\b/i,
+  )
+  const commandWord = commandWordMatch?.[1]?.toLowerCase() ?? ''
+  const questionKeywords = Array.from(
+    new Set(extractKeywords(question).filter((keyword) => keyword !== commandWord)),
+  )
+  const answerKeywords = new Set(extractKeywords(answer))
+  const matchedKeywords = questionKeywords.filter((keyword) => answerKeywords.has(keyword))
+  const missingKeywords = questionKeywords.filter((keyword) => !answerKeywords.has(keyword))
+  const commandWordExpectations = {
+    explain: /\b(because|therefore|as a result|this shows|which means|so)\b/i,
+    compare: /\b(both|whereas|while|however|similarly|in contrast|difference|similar)\b/i,
+    evaluate: /\b(overall|judgement|however|although|balance|more important|to a large extent)\b/i,
+    describe: /\b(there is|it is|shown by|has|contains|includes|features)\b/i,
+    analyse: /\b(because|therefore|suggests|implies|shows|leads to)\b/i,
+    analyze: /\b(because|therefore|suggests|implies|shows|leads to)\b/i,
+    assess: /\b(overall|judgement|however|although|balance|weigh|more effective)\b/i,
+    calculate: /\b(\d|=|×|÷|working|formula|equation|substitut|calculate|solve)\b/i,
+    justify: /\b(because|therefore|evidence|reason|supports)\b/i,
+    discuss: /\b(however|although|overall|both|on the other hand|balance)\b/i,
+    outline: /\b(briefly|overall|main point|mainly|in summary)\b/i,
+    state: /\b(shortly|simply|is|are|was|were|equals|=)\b/i,
+    identify: /\b(is|are|was|were|means|refers to|shows|represents)\b/i,
+    name: /\b(is|are|was|were|called|known as|named)\b/i,
+    define: /\b(means|refers to|is the|can be defined|defined as)\b/i,
+    summarise: /\b(in summary|overall|briefly|main point|short)\b/i,
+    summarize: /\b(in summary|overall|briefly|main point|short)\b/i,
+  }
+  const commandWordPattern =
+    commandWord ? commandWordExpectations[commandWord] ?? /\b(because|therefore|however|overall|working|formula|evidence)\b/i : null
+  const usesCommandStyle = commandWordPattern ? commandWordPattern.test(answer) : false
+  const keywordCoverage = questionKeywords.length ? matchedKeywords.length / questionKeywords.length : 0
+
+  return {
+    question,
+    answer,
+    questionKeywords,
+    matchedKeywords,
+    missingKeywords,
+    commandWord,
+    usesCommandStyle,
+    keywordCoverage,
+  }
+}
+
 function getBoardSpecificFeedback(board, mode) {
   switch (board) {
     case 'AQA':
@@ -21,8 +151,14 @@ function getBoardSpecificFeedback(board, mode) {
   }
 }
 
-export function scoreEssay(answer, topBand, board = 'AQA') {
-  const text = typeof answer === 'string' ? answer.trim() : ''
+export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
+  const { questionText, answerText, topBand, board } = normalizeScoringOptions(
+    options,
+    legacyTopBand,
+    legacyBoard,
+  )
+  const text = normaliseText(answerText)
+  const questionAnalysis = buildQuestionAnalysis(questionText, text)
 
   if (!text) {
     return {
@@ -77,11 +213,44 @@ export function scoreEssay(answer, topBand, board = 'AQA') {
     ao2.push(boardSpecificFeedback)
   }
 
+  if (questionAnalysis.questionKeywords.length) {
+    const matchedSnippet = questionAnalysis.matchedKeywords.slice(0, 3).join(', ')
+    const missingSnippet = questionAnalysis.missingKeywords.slice(0, 3).join(', ')
+
+    if (questionAnalysis.matchedKeywords.length >= 2 || questionAnalysis.keywordCoverage >= 0.35) {
+      score += 1
+      ao2.push(
+        matchedSnippet
+          ? `Question-aware check: key terms such as ${matchedSnippet} appear in the answer.`
+          : 'Question-aware check: the answer uses key terms from the prompt, which keeps it focused.',
+      )
+    } else {
+      ao2.push(
+        missingSnippet
+          ? `Question-aware check: bring in more prompt terms such as ${missingSnippet} so the response stays on task.`
+          : 'Question-aware check: use more of the question wording so the response stays on task.',
+      )
+    }
+  }
+
   if (hasEvaluation) {
     ao3.push('There is some evaluation or judgement, which helps the top bands.')
     score += 1
   } else {
     ao3.push('Add a clear judgement or comparison to reach stronger AO3 levels.')
+  }
+
+  if (questionAnalysis.commandWord) {
+    if (questionAnalysis.usesCommandStyle) {
+      score += 1
+      ao3.push(
+        `The question asks you to ${questionAnalysis.commandWord}, and your response shows that style clearly.`,
+      )
+    } else {
+      ao3.push(
+        `The question asks you to ${questionAnalysis.commandWord}, so add more of the matching style (reasoning, comparison, or evaluation).`,
+      )
+    }
   }
 
   if (hasStructure) {
@@ -113,12 +282,20 @@ export function scoreEssay(answer, topBand, board = 'AQA') {
       ? hasSustainedDevelopment
         ? 'Grade 9 / Top Band focus: make every paragraph precise, conceptual, and evaluative.'
         : 'Top Band mode is on, but this response needs more development (over 150 words) before full top-band feedback applies.'
-      : 'Focus on specific knowledge, explanation, and a clear conclusion.',
+      : questionAnalysis.questionKeywords.length
+        ? 'Focus on specific knowledge, explanation, and staying aligned to the question.'
+        : 'Focus on specific knowledge, explanation, and a clear conclusion.',
   }
 }
 
-export function scoreMathsScience(answer, topBand, board = 'AQA') {
-  const text = typeof answer === 'string' ? answer.trim() : ''
+export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQA') {
+  const { questionText, answerText, topBand, board } = normalizeScoringOptions(
+    options,
+    legacyTopBand,
+    legacyBoard,
+  )
+  const text = normaliseText(answerText)
+  const questionAnalysis = buildQuestionAnalysis(questionText, text)
 
   if (!text) {
     return {
@@ -199,6 +376,26 @@ export function scoreMathsScience(answer, topBand, board = 'AQA') {
     addMethodMark('You include topic vocabulary or scientific context, which helps demonstrate understanding.')
   }
 
+  if (questionAnalysis.questionKeywords.length) {
+    const matchedSnippet = questionAnalysis.matchedKeywords.slice(0, 3).join(', ')
+    const missingSnippet = questionAnalysis.missingKeywords.slice(0, 3).join(', ')
+
+    if (questionAnalysis.matchedKeywords.length >= 2 || questionAnalysis.keywordCoverage >= 0.35) {
+      score += 1
+      addMethodMark(
+        matchedSnippet
+          ? `Question-aware check: you reuse key terms such as ${matchedSnippet}, which keeps the working on task.`
+          : 'Question-aware check: you reuse key terms from the prompt, which keeps the working on task.',
+      )
+    } else {
+      addMethodMark(
+        missingSnippet
+          ? `Question-aware check: use more of the prompt wording such as ${missingSnippet} so the method stays focused.`
+          : 'Question-aware check: use more of the prompt wording so the method stays focused.',
+      )
+    }
+  }
+
   if (hasSustainedReasoning) {
     score += 1
     addMethodMark('Your response is long enough to show a fuller chain of reasoning.')
@@ -207,6 +404,15 @@ export function scoreMathsScience(answer, topBand, board = 'AQA') {
     }
   } else if (topBand) {
     addMethodMark('Top Band feedback unlocks best when the answer is more fully developed (over 100 words).')
+  }
+
+  if (questionAnalysis.commandWord) {
+    if (questionAnalysis.usesCommandStyle) {
+      score += 1
+      addMethodMark(`The prompt asks you to ${questionAnalysis.commandWord}, and your response shows that process clearly.`)
+    } else {
+      addMethodMark(`The prompt asks you to ${questionAnalysis.commandWord}, so make that method style more obvious in your working.`)
+    }
   }
 
   const boardSpecificFeedback = getBoardSpecificFeedback(board, 'maths_science')
@@ -222,7 +428,9 @@ export function scoreMathsScience(answer, topBand, board = 'AQA') {
     ao3: ['If this is a science question, include the key scientific idea, correct units, and any required conclusion.'],
     summary: topBand
       ? 'Top Band mode: maximise the working trail and annotate every step.'
-      : 'Method marks focus on visible working and correct process.',
+      : questionAnalysis.questionKeywords.length
+        ? 'Method marks focus on visible working, correct process, and staying aligned to the question.'
+        : 'Method marks focus on visible working and correct process.',
     extra: methodMarks,
   }
 }

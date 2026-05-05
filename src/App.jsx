@@ -474,7 +474,12 @@ export default function App() {
       }
 
       const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
-      const result = analyzer(answerText, topBand, board)
+      const result = analyzer({
+        questionText: trimmedQuestion,
+        answerText: trimmedAnswer,
+        topBand,
+        board,
+      })
       if (!mountedRef.current) return
       setMarkResult(result)
 

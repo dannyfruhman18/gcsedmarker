@@ -491,3 +491,15 @@ textarea:focus-visible,
 input:focus-visible {
   box-shadow: 0 0 0 4px var(--focus-shadow);
 }
+
+@media (min-width: 1101px) {
+  .hero {
+    grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+    align-items: stretch;
+  }
+
+  .chat-layout {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    align-items: start;
+  }
+}
