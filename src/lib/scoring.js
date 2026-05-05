@@ -374,7 +374,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   }
 
   let score = 0
-  const hasVisibleCalculation = /[+\-*/=×÷^√→]/.test(text)
+  const hasVisibleCalculation = /[+\-*/×÷^√→]/.test(text) || /=>/.test(text)
   const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate)\b|→|=>/i.test(text)
   const hasWorkingTrail = lines.length >= 2 && (hasVisibleCalculation || hasProcessLanguage)
   const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage

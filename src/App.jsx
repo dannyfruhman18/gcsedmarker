@@ -219,7 +219,7 @@ export default function App() {
     const normalizedEmail = normalizeEmail(email)
     const subscriptionsPath = normalizedEmail
       ? `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
-      : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200'
+      : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=5'
 
     const controller = new AbortController()
     subscriptionsControllerRef.current = controller
