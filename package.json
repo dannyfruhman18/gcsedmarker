@@ -3,7 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "description": "GCSEmarker app for exam-board-aware marking, Top Band feedback, and subscription access.",
-  "type": "commonjs",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
