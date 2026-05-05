@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { createWorker } from 'tesseract.js'
 import './styles.css'
 
+// Vercel environment variables required for production:
+// - VITE_SUPABASE_URL
+// - VITE_SUPABASE_ANON_KEY
+// - VITE_STRIPE_PAYMENT_LINK (optional; enables the Stripe checkout flow)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
@@ -125,6 +129,19 @@ async function supabaseRequest(path, options = {}, signal) {
 }
 
 function scoreEssay(answer, topBand) {
+  if (typeof answer !== 'string') {
+    return {
+      maxMarks: topBand ? 4 : 3,
+      score: 0,
+      ao1: ['No valid essay answer was provided. Please enter text to receive feedback.'],
+      ao2: ['Essay feedback only works with text input.'],
+      ao3: ['Paste or type a student response so the marker can analyse it.'],
+      summary: topBand
+        ? 'Top Band mode needs a valid essay response to analyse.'
+        : 'Enter a text answer to receive essay feedback.',
+    }
+  }
+
   const text = answer.trim()
   const length = text.split(/\s+/).filter(Boolean).length
   const ao1 = []
@@ -174,6 +191,20 @@ function scoreEssay(answer, topBand) {
 }
 
 function scoreMathsScience(answer, topBand) {
+  if (typeof answer !== 'string') {
+    return {
+      maxMarks: topBand ? 5 : 4,
+      score: 0,
+      ao1: ['No valid answer was provided. Please enter text to receive method-mark feedback.'],
+      ao2: ['Maths/science feedback only works with text input.'],
+      ao3: ['Paste or type the working, calculation steps, or final answer.'],
+      summary: topBand
+        ? 'Top Band mode needs a valid maths/science response to analyse.'
+        : 'Enter working or an answer to receive method-mark feedback.',
+      extra: [],
+    }
+  }
+
   const text = answer.trim()
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
   const methodMarks = []
