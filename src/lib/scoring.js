@@ -118,7 +118,7 @@ export function scoreMathsScience(answer, topBand) {
     methodMarks.push('Include units where needed and keep the final answer contextualised.')
   }
 
-  if (/\b(therefore|because|so|hence|which means|final answer)/i.test(text)) {
+  if (/\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)) {
     marks.add('conclusion')
     methodMarks.push('You are moving from working to a conclusion, which helps the final-mark award.')
   }
