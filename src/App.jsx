@@ -21,19 +21,13 @@ import {
   supabaseRequest,
 } from './lib/supabase'
 
-async function extractQuestionTextFromImage(file, onProgress) {
-  const worker = await createWorker('eng', 1, {
-    logger: (message) => {
-      if (message?.status) onProgress?.(`OCR: ${message.status}`)
-    },
-  })
-
-  try {
-    const result = await worker.recognize(file)
-    return result?.data?.text?.trim() ?? ''
-  } finally {
-    await worker.terminate()
+async function extractQuestionTextFromImage(file, onProgress, worker) {
+  if (!worker) {
+    throw new Error('OCR worker is not available.')
   }
+
+  const result = await worker.recognize(file)
+  return result?.data?.text?.trim() ?? ''
 }
 
 export default function App() {
@@ -68,6 +62,7 @@ export default function App() {
   const sessionsControllerRef = useRef(null)
   const subscriptionsControllerRef = useRef(null)
   const configErrorLoggedRef = useRef(false)
+  const workerRef = useRef(null)
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -249,6 +244,10 @@ export default function App() {
       subscriptionsControllerRef.current?.abort()
       requestControllersRef.current.forEach((controller) => controller.abort())
       requestControllersRef.current.clear()
+      if (workerRef.current) {
+        void workerRef.current.terminate().catch(() => {})
+        workerRef.current = null
+      }
     }
   }, [])
 
@@ -274,6 +273,16 @@ export default function App() {
 
     const uploadRequestId = ++uploadRequestIdRef.current
     const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
+
+    if (workerRef.current) {
+      try {
+        await workerRef.current.terminate()
+      } catch (terminateErr) {
+        console.warn('Previous OCR worker could not be terminated:', terminateErr)
+      } finally {
+        workerRef.current = null
+      }
+    }
 
     const isImageType = Boolean(
       (file.type && file.type.startsWith('image/')) ||
@@ -302,12 +311,24 @@ export default function App() {
     setUploadPreview(nextPreview)
     setOcrStatus('Reading text from the image...')
 
+    let worker = null
+
     try {
+      worker = await createWorker('eng', 1, {
+        logger: (message) => {
+          if (message?.status && mountedRef.current && isLatestUpload()) {
+            setOcrStatus(`OCR: ${message.status}`)
+          }
+        },
+      })
+
+      workerRef.current = worker
+
       const extracted = await extractQuestionTextFromImage(file, (status) => {
         if (mountedRef.current && isLatestUpload()) {
           setOcrStatus(status)
         }
-      })
+      }, worker)
       if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
@@ -332,6 +353,16 @@ ${extractedText}`
       console.error('OCR failed while reading uploaded question:', err)
       setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
     } finally {
+      if (worker && workerRef.current === worker) {
+        try {
+          await worker.terminate()
+        } catch (terminateErr) {
+          console.warn('OCR worker cleanup failed:', terminateErr)
+        } finally {
+          workerRef.current = null
+        }
+      }
+
       if (isLatestUpload() && mountedRef.current) {
         setOcrLoading(false)
       }
@@ -616,8 +647,26 @@ ${extractedText}`
           </div>
 
           <div className="dropzone">
-            <input id="upload" type="file" accept="image/*" onChange={(e) => void handleFileChange(e.target.files?.[0])} />
-            <label htmlFor="upload" className="upload-button">
+            <input
+              id="upload"
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                void handleFileChange(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+            <label
+              htmlFor="upload"
+              className="upload-button"
+              tabIndex="0"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  document.getElementById('upload')?.click()
+                }
+              }}
+            >
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
             </label>
