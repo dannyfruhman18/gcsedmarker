@@ -33,9 +33,13 @@ export const BOARD_LINKS = {
     label: 'OCR past paper finder',
     href: 'https://www.ocr.org.uk/qualifications/past-paper-finder/',
   },
+  WJEC: {
+    label: 'WJEC past papers and mark schemes',
+    href: 'https://www.wjec.co.uk/home/past-papers/',
+  },
 }
 
-export const boardOptions = ['AQA', 'Edexcel', 'OCR']
+export const boardOptions = ['AQA', 'Edexcel', 'OCR', 'WJEC']
 
 export const modeOptions = [
   { id: 'essay', label: 'Essay marking' },

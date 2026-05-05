@@ -12,6 +12,10 @@ function getBoardSpecificFeedback(board, mode) {
       return mode === 'essay'
         ? 'OCR focus: balance evidence, explanation, and judgement across your response.'
         : 'OCR focus on accuracy: show the working trail and include the final conclusion clearly.'
+    case 'WJEC':
+      return mode === 'essay'
+        ? 'Ensure your points specifically address the WJEC assessment objectives for your subject.'
+        : 'WJEC math/science marking values clear step-by-step methodology.'
     default:
       return 'Keep your response aligned to the question and show your reasoning clearly.'
   }
