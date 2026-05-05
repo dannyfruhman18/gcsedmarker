@@ -11,6 +11,8 @@ const SUPABASE_CONFIG_ERROR =
     ? 'Supabase is not configured. Set both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to load and save data.'
     : null
 
+const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 if (SUPABASE_CONFIG_ERROR) {
   console.error(
     'GCSEmarker configuration error: missing VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY. Supabase requests will fail until these environment variables are provided.',
@@ -327,15 +329,14 @@ function App() {
     try {
       setLoadingSubscriptions(true)
       const normalizedEmail = normalizeEmail(email)
-      const emailFilter = normalizedEmail ? `&email=eq.${encodeURIComponent(normalizedEmail)}` : ''
+      const subscriptionsPath = normalizedEmail
+        ? `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
+        : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200'
       // TODO: Query subscriptions by email/status on the server instead of loading a broad recent history for better scale.
-      const rows = await supabaseRequest(
-        `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200${emailFilter}`,
-        {
-          method: 'GET',
-          headers: { Accept: 'application/json' },
-        },
-      )
+      const rows = await supabaseRequest(subscriptionsPath, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      })
       const nextRows = Array.isArray(rows) ? rows : []
       setRecentSubscriptions(nextRows)
       setSubscriptionsError(null)
@@ -394,6 +395,13 @@ function App() {
 
     const trimmedQuestion = questionText.trim()
     const trimmedAnswer = answerText.trim()
+    const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
+    const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
+
+    if (hasSubscriptionEmail && !EMAIL_ADDRESS_REGEX.test(normalizedMarkEmail)) {
+      setError('Add a valid email address before marking, or leave it blank for demo mode.')
+      return
+    }
 
     if (!trimmedQuestion && !trimmedAnswer) {
       setMarkResult({
@@ -409,13 +417,17 @@ function App() {
 
     setSaving(true)
     try {
-      const refreshedSubscriptions = await loadSubscriptions(normalizedSubscriptionEmail)
-      const subscriptionLoadFailed = refreshedSubscriptions === null
-      const hasActiveSubscription = subscriptionLoadFailed
-        ? activeSubscription
-        : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedSubscriptionEmail)
+      const refreshedSubscriptions = hasSubscriptionEmail
+        ? await loadSubscriptions(normalizedMarkEmail)
+        : []
+      const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
+      const hasActiveSubscription = !hasSubscriptionEmail
+        ? true
+        : subscriptionLoadFailed
+          ? activeSubscription
+          : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
 
-      if (STRIPE_PAYMENT_LINK && subscriptionLoadFailed) {
+      if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && subscriptionLoadFailed) {
         const message = 'Subscription validation failed. Please try again before marking.'
         setError(message)
         setMarkResult({
@@ -429,7 +441,7 @@ function App() {
         return
       }
 
-      if (STRIPE_PAYMENT_LINK && !subscriptionLoadFailed && !hasActiveSubscription) {
+      if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !subscriptionLoadFailed && !hasActiveSubscription) {
         setMarkResult({
           score: 0,
           maxMarks: topBand ? 5 : 4,
@@ -480,7 +492,7 @@ function App() {
     setSubscriptionsError(null)
 
     const email = normalizeEmail(subscriptionEmail)
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!email || !EMAIL_ADDRESS_REGEX.test(email)) {
       setSubscriptionResult('Add a valid email address.')
       return
     }
