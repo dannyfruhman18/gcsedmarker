@@ -5,6 +5,37 @@ import {
   SUPABASE_CONFIG_ERROR,
 } from './constants'
 
+function getSupabaseRequestConfigError() {
+  if (SUPABASE_CONFIG_ERROR) {
+    return SUPABASE_CONFIG_ERROR
+  }
+
+  if (!SUPABASE_BASE_URL) {
+    return 'Supabase configuration is incomplete: VITE_SUPABASE_URL is missing.'
+  }
+
+  try {
+    const parsedUrl = new URL(SUPABASE_BASE_URL)
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return `Supabase URL must use http or https: "${SUPABASE_BASE_URL}".`
+    }
+  } catch {
+    return `Supabase URL is invalid: "${SUPABASE_BASE_URL}". Set VITE_SUPABASE_URL to a full https:// project URL.`
+  }
+
+  if (!SUPABASE_ANON_KEY) {
+    return 'Supabase configuration is incomplete: VITE_SUPABASE_ANON_KEY is missing.'
+  }
+
+  return null
+}
+
+function normaliseRequestPath(path) {
+  const value = String(path ?? '').trim()
+  if (!value) return '/'
+  return value.startsWith('/') ? value : `/${value}`
+}
+
 export function safeParseJson(text) {
   if (!text) return null
 
@@ -58,10 +89,13 @@ export function formatDateTime(value) {
 }
 
 export async function supabaseRequest(path, options = {}, signal) {
-  if (SUPABASE_CONFIG_ERROR) {
-    throw new Error(SUPABASE_CONFIG_ERROR)
+  const configError = getSupabaseRequestConfigError()
+  if (configError) {
+    throw new Error(configError)
   }
 
+  const requestPath = normaliseRequestPath(path)
+  const requestUrl = `${SUPABASE_BASE_URL.replace(/\/+$/, '')}${requestPath}`
   const hasBody = options.body !== undefined && options.body !== null
   const headers = {
     apikey: SUPABASE_ANON_KEY,
@@ -73,22 +107,31 @@ export async function supabaseRequest(path, options = {}, signal) {
     headers['Content-Type'] = 'application/json'
   }
 
-  const response = await fetch(`${SUPABASE_BASE_URL}${path}`, {
-    ...options,
-    signal: signal ?? options.signal,
-    headers,
-  })
+  let response
+  try {
+    response = await fetch(requestUrl, {
+      ...options,
+      signal: signal ?? options.signal,
+      headers,
+    })
+  } catch (error) {
+    throw new Error(
+      `Supabase request to ${requestPath} failed before a response was received: ${error?.message || String(error)}`,
+    )
+  }
 
   const text = await response.text()
   const data = safeParseJson(text)
 
   if (!response.ok) {
-    const message =
+    const responseDetail =
       typeof data === 'string'
-        ? data
-        : data?.message || data?.error_description || data?.hint || response.statusText
+        ? data.trim() || response.statusText
+        : data?.message || data?.error_description || data?.hint || response.statusText || 'Unknown Supabase error'
 
-    throw new Error(`${message} (${response.status})`)
+    throw new Error(
+      `Supabase request to ${requestPath} failed (${response.status} ${response.statusText}): ${responseDetail}`,
+    )
   }
 
   return data
