@@ -12,6 +12,8 @@ const SUPABASE_CONFIG_ERROR =
     : null
 
 const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing', 'paid', 'past_due'])
 
 if (SUPABASE_CONFIG_ERROR) {
   console.error(
@@ -77,7 +79,7 @@ function normalizeEmail(value) {
 }
 
 function isActiveSubscriptionRow(row) {
-  return String(row?.status || '').trim().toLowerCase() === 'active'
+  return ACTIVE_SUBSCRIPTION_STATUSES.has(String(row?.status || '').trim().toLowerCase())
 }
 
 function subscriptionHasActiveAccess(rows, email) {
@@ -92,13 +94,14 @@ function formatDateTime(value) {
   return Number.isNaN(date.getTime()) ? 'Unknown date' : date.toLocaleString()
 }
 
-async function supabaseRequest(path, options = {}) {
+async function supabaseRequest(path, options = {}, signal) {
   if (SUPABASE_CONFIG_ERROR) {
     throw new Error(SUPABASE_CONFIG_ERROR)
   }
 
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     ...options,
+    signal: signal ?? options.signal,
     headers: {
       apikey: SUPABASE_ANON_KEY,
       Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
@@ -264,6 +267,8 @@ function App() {
   const [subscriptionsError, setSubscriptionsError] = useState(null)
 
   const uploadRequestIdRef = useRef(0)
+  const mountedRef = useRef(true)
+  const requestControllersRef = useRef(new Set())
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -273,6 +278,14 @@ function App() {
   const activeSubscription = useMemo(() => {
     return subscriptionHasActiveAccess(recentSubscriptions, normalizedSubscriptionEmail)
   }, [recentSubscriptions, normalizedSubscriptionEmail])
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+      requestControllersRef.current.forEach((controller) => controller.abort())
+      requestControllersRef.current.clear()
+    }
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -288,29 +301,58 @@ function App() {
   }, [])
 
   async function loadSessions() {
+    const controller = new AbortController()
+    requestControllersRef.current.add(controller)
+
     setSessionsError(null)
     try {
+      if (!mountedRef.current) {
+        controller.abort()
+        return []
+      }
+
       setLoadingSessions(true)
-      const rows = await supabaseRequest('/rest/v1/marking_sessions?select=*&order=created_at.desc&limit=5', {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      })
+      const rows = await supabaseRequest(
+        '/rest/v1/marking_sessions?select=*&order=created_at.desc&limit=5',
+        {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        },
+        controller.signal,
+      )
       const nextRows = Array.isArray(rows) ? rows : []
+      if (!mountedRef.current || controller.signal.aborted) return nextRows
+
       setRecentSessions(nextRows)
       setSessionsError(null)
       return nextRows
     } catch (err) {
+      if (controller.signal.aborted) return []
+
       console.error(err)
-      setSessionsError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
+      if (mountedRef.current) {
+        setSessionsError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
+      }
       return []
     } finally {
-      setLoadingSessions(false)
+      requestControllersRef.current.delete(controller)
+      if (mountedRef.current && !controller.signal.aborted) {
+        setLoadingSessions(false)
+      }
     }
   }
 
   async function loadSubscriptions(email = '') {
+    const controller = new AbortController()
+    requestControllersRef.current.add(controller)
+
     setSubscriptionsError(null)
     try {
+      if (!mountedRef.current) {
+        controller.abort()
+        return null
+      }
+
       setLoadingSubscriptions(true)
       const normalizedEmail = normalizeEmail(email)
       const subscriptionsPath = normalizedEmail
@@ -320,22 +362,46 @@ function App() {
       const rows = await supabaseRequest(subscriptionsPath, {
         method: 'GET',
         headers: { Accept: 'application/json' },
-      })
+      }, controller.signal)
       const nextRows = Array.isArray(rows) ? rows : []
+      if (!mountedRef.current || controller.signal.aborted) return nextRows
+
       setRecentSubscriptions(nextRows)
       setSubscriptionsError(null)
       return nextRows
     } catch (err) {
+      if (controller.signal.aborted) return null
+
       console.error(err)
-      setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
+      if (mountedRef.current) {
+        setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
+      }
       return null
     } finally {
-      setLoadingSubscriptions(false)
+      requestControllersRef.current.delete(controller)
+      if (mountedRef.current && !controller.signal.aborted) {
+        setLoadingSubscriptions(false)
+      }
     }
   }
 
   async function handleFileChange(file) {
     if (!file) return
+
+    const isImageType = Boolean(
+      (file.type && file.type.startsWith('image/')) ||
+      /\.(png|jpe?g|gif|webp|bmp|avif|heic|heif)$/i.test(file.name || ''),
+    )
+
+    if (!isImageType) {
+      setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
+      return
+    }
+
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
+      return
+    }
 
     const uploadRequestId = ++uploadRequestIdRef.current
     const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
@@ -353,7 +419,7 @@ function App() {
 
     try {
       const extracted = await extractQuestionTextFromImage(file, setOcrStatus)
-      if (!isLatestUpload()) return
+      if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
         setQuestionText(extracted)
@@ -362,12 +428,12 @@ function App() {
         setOcrStatus('No clear text found. You can type or paste the question manually.')
       }
     } catch (err) {
-      if (!isLatestUpload()) return
+      if (!mountedRef.current || !isLatestUpload()) return
 
       console.error(err)
-      setOcrStatus('OCR failed — please type the question manually.')
+      setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
     } finally {
-      if (isLatestUpload()) {
+      if (isLatestUpload() && mountedRef.current) {
         setOcrLoading(false)
       }
     }
@@ -404,6 +470,8 @@ function App() {
       const refreshedSubscriptions = hasSubscriptionEmail
         ? await loadSubscriptions(normalizedMarkEmail)
         : []
+      if (!mountedRef.current) return
+
       const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
       const hasActiveSubscription = !hasSubscriptionEmail
         ? true
@@ -413,32 +481,37 @@ function App() {
 
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && subscriptionLoadFailed) {
         const message = 'Subscription validation failed. Please try again before marking.'
-        setError(message)
-        setMarkResult({
-          score: 0,
-          maxMarks: topBand ? 5 : 4,
-          summary: message,
-          ao1: ['Unable to verify subscription status right now. Please retry or refresh status.'],
-          ao2: [],
-          ao3: [],
-        })
+        if (mountedRef.current) {
+          setError(message)
+          setMarkResult({
+            score: 0,
+            maxMarks: topBand ? 5 : 4,
+            summary: message,
+            ao1: ['Unable to verify subscription status right now. Please retry or refresh status.'],
+            ao2: [],
+            ao3: [],
+          })
+        }
         return
       }
 
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !subscriptionLoadFailed && !hasActiveSubscription) {
-        setMarkResult({
-          score: 0,
-          maxMarks: topBand ? 5 : 4,
-          summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.',
-          ao1: ['This workspace is currently configured to require an active subscription before marking.'],
-          ao2: [],
-          ao3: [],
-        })
+        if (mountedRef.current) {
+          setMarkResult({
+            score: 0,
+            maxMarks: topBand ? 5 : 4,
+            summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.',
+            ao1: ['This workspace is currently configured to require an active subscription before marking.'],
+            ao2: [],
+            ao3: [],
+          })
+        }
         return
       }
 
       const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
       const result = analyzer(answerText, topBand)
+      if (!mountedRef.current) return
       setMarkResult(result)
 
       await supabaseRequest('/rest/v1/marking_sessions', {
@@ -456,9 +529,13 @@ function App() {
           },
         ]),
       })
+      if (!mountedRef.current) return
+
       setError(null)
       await loadSessions()
     } catch (err) {
+      if (!mountedRef.current) return
+
       const message = `Supabase save failed: ${err?.message || String(err)}`
       setError(message)
       setMarkResult((current) => ({
@@ -466,7 +543,9 @@ function App() {
         storageError: message,
       }))
     } finally {
-      setSaving(false)
+      if (mountedRef.current) {
+        setSaving(false)
+      }
     }
   }
 
@@ -497,6 +576,8 @@ function App() {
         ]),
       })
 
+      if (!mountedRef.current) return
+
       let stripePopupBlocked = false
       if (STRIPE_PAYMENT_LINK) {
         const stripeWindow = window.open(STRIPE_PAYMENT_LINK, '_blank', 'noreferrer')
@@ -504,6 +585,8 @@ function App() {
       }
 
       await loadSubscriptions(normalizedSubscriptionEmail)
+      if (!mountedRef.current) return
+
       setError(null)
       setSubscriptionResult(
         STRIPE_PAYMENT_LINK
@@ -513,11 +596,15 @@ function App() {
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.'
       )
     } catch (err) {
+      if (!mountedRef.current) return
+
       const message = `Subscription save failed: ${err?.message || String(err)}`
       setError(message)
       setSubscriptionResult(message)
     } finally {
-      setSubmittingSubscription(false)
+      if (mountedRef.current) {
+        setSubmittingSubscription(false)
+      }
     }
   }
 
