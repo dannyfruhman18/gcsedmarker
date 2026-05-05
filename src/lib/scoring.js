@@ -104,7 +104,7 @@ export function scoreMathsScience(answer, topBand) {
     methodMarks.push('You are off to a good start — add your working or final answer to unlock feedback.')
   }
 
-  if (/=|→|=>|\bsubstitut(e|ion)\b|\bcalculate\b|\bshow\b/i.test(text)) {
+  if (/\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?)\b|→|=>/i.test(text)) {
     marks.add('process')
     methodMarks.push('Your response includes process language or a clear calculation trail.')
   } else {
@@ -118,7 +118,7 @@ export function scoreMathsScience(answer, topBand) {
     methodMarks.push('Include units where needed and keep the final answer contextualised.')
   }
 
-  if (/\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)) {
+  if (/\b(therefore|because|so|hence|which means|final answer)/i.test(text)) {
     marks.add('conclusion')
     methodMarks.push('You are moving from working to a conclusion, which helps the final-mark award.')
   }
