@@ -209,8 +209,10 @@ select, textarea, input[type='email'] {
   color: var(--color-text);
   padding: 12px 14px;
 }
-.dropzone input[type='file'] {
-  display: none;
+.dropzone input[type='file'].visually-hidden:focus-visible + .upload-button,
+.dropzone input[type='file'].visually-hidden:focus + .upload-button {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 .upload-button {
   cursor: pointer;
@@ -246,6 +248,11 @@ textarea { resize: vertical; min-height: 110px; }
   gap: 10px;
   margin-bottom: 12px;
 }
+.dropzone.loading {
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: wait;
+}
 .file-name { color: var(--color-text-muted); margin: 0; overflow-wrap: anywhere; }
 .preview {
   width: 100%;
@@ -277,6 +284,23 @@ textarea { resize: vertical; min-height: 110px; }
 .secondary {
   background: var(--surface-soft);
   color: var(--color-text);
+}
+.clear-button {
+  background: var(--surface-soft-subtle);
+  color: var(--color-text-muted);
+  border: 1px solid var(--surface-input-border);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 4px;
+  margin-left: auto;
+}
+.clear-button:hover {
+  background: var(--surface-soft-hover);
+  color: var(--color-text);
+  border-color: var(--surface-input-border-strong);
 }
 
 .result-card {

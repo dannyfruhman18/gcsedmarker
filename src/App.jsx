@@ -21,19 +21,13 @@ import {
   supabaseRequest,
 } from './lib/supabase'
 
-async function extractQuestionTextFromImage(file, onProgress) {
-  const worker = await createWorker('eng', 1, {
-    logger: (message) => {
-      if (message?.status) onProgress?.(`OCR: ${message.status}`)
-    },
-  })
-
-  try {
-    const result = await worker.recognize(file)
-    return result?.data?.text?.trim() ?? ''
-  } finally {
-    await worker.terminate()
+async function extractQuestionTextFromImage(file, onProgress, worker) {
+  if (!worker) {
+    throw new Error('OCR worker is not available.')
   }
+
+  const result = await worker.recognize(file)
+  return result?.data?.text?.trim() ?? ''
 }
 
 export default function App() {
@@ -68,6 +62,7 @@ export default function App() {
   const sessionsControllerRef = useRef(null)
   const subscriptionsControllerRef = useRef(null)
   const configErrorLoggedRef = useRef(false)
+  const workerRef = useRef(null)
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -223,13 +218,15 @@ export default function App() {
     )
   }, [loadSubscriptions, normalizedSubscriptionEmail])
 
-  const clearUploadState = useCallback(() => {
+  const clearUpload = useCallback(() => {
     if (uploadPreview) {
       URL.revokeObjectURL(uploadPreview)
     }
 
+    uploadRequestIdRef.current += 1
     setUploadName('')
     setUploadPreview('')
+    setOcrStatus('Upload an image and OCR will fill the question box.')
     setOcrLoading(false)
   }, [uploadPreview])
 
@@ -247,6 +244,10 @@ export default function App() {
       subscriptionsControllerRef.current?.abort()
       requestControllersRef.current.forEach((controller) => controller.abort())
       requestControllersRef.current.clear()
+      if (workerRef.current) {
+        void workerRef.current.terminate().catch(() => {})
+        workerRef.current = null
+      }
     }
   }, [])
 
@@ -273,19 +274,29 @@ export default function App() {
     const uploadRequestId = ++uploadRequestIdRef.current
     const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
 
+    if (workerRef.current) {
+      try {
+        await workerRef.current.terminate()
+      } catch (terminateErr) {
+        console.warn('Previous OCR worker could not be terminated:', terminateErr)
+      } finally {
+        workerRef.current = null
+      }
+    }
+
     const isImageType = Boolean(
       (file.type && file.type.startsWith('image/')) ||
         /\.(png|jpe?g|gif|webp|bmp|avif|heic|heif)$/i.test(file.name || ''),
     )
 
     if (!isImageType) {
-      clearUploadState()
+      clearUpload()
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
     }
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      clearUploadState()
+      clearUpload()
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
     }
@@ -300,16 +311,36 @@ export default function App() {
     setUploadPreview(nextPreview)
     setOcrStatus('Reading text from the image...')
 
+    let worker = null
+
     try {
+      worker = await createWorker('eng', 1, {
+        logger: (message) => {
+          if (message?.status && mountedRef.current && isLatestUpload()) {
+            setOcrStatus(`OCR: ${message.status}`)
+          }
+        },
+      })
+
+      workerRef.current = worker
+
       const extracted = await extractQuestionTextFromImage(file, (status) => {
         if (mountedRef.current && isLatestUpload()) {
           setOcrStatus(status)
         }
-      })
+      }, worker)
       if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
-        setQuestionText(extracted)
+        setQuestionText((currentText) => {
+          const existingText = currentText.trim()
+          const extractedText = extracted.trim()
+
+          if (!existingText) return extractedText
+          if (!extractedText) return currentText
+
+          return `${existingText}\n\n${extractedText}`
+        })
         setOcrStatus(`Text read from image (${extracted.split(/\s+/).filter(Boolean).length} words).`)
       } else {
         setOcrStatus('No clear text found. You can type or paste the question manually.')
@@ -318,9 +349,18 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       console.error('OCR failed while reading uploaded question:', err)
-      setQuestionText('')
       setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
     } finally {
+      if (worker && workerRef.current === worker) {
+        try {
+          await worker.terminate()
+        } catch (terminateErr) {
+          console.warn('OCR worker cleanup failed:', terminateErr)
+        } finally {
+          workerRef.current = null
+        }
+      }
+
       if (isLatestUpload() && mountedRef.current) {
         setOcrLoading(false)
       }
@@ -611,7 +651,18 @@ export default function App() {
               <span>JPG, PNG, or camera image</span>
             </label>
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
-            <p className="muted">{ocrStatus}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <p className="muted" style={{ margin: 0, flex: '1 1 220px' }}>{ocrStatus}</p>
+              {uploadPreview ? (
+                <button
+                  type="button"
+                  className="clear-button"
+                  onClick={clearUpload}
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
             {uploadPreview ? <img className="preview" src={uploadPreview} alt="Uploaded question preview" /> : null}
           </div>
 
