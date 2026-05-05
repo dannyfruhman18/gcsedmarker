@@ -611,7 +611,7 @@ export default function App() {
       ) : null}
 
       <main className="chat-layout">
-        <section className={`panel dropzone ${ocrLoading ? 'loading' : ''}`}>
+        <section className="panel">
           <div className="panel-header">
             <h2>Mark a GCSE answer</h2>
             <div className="board-links">
@@ -644,7 +644,7 @@ export default function App() {
             </label>
           </div>
 
-          <div className="dropzone">
+          <div className={`dropzone ${ocrLoading ? 'loading' : ''}`}>
             <input
               id="upload"
               type="file"
