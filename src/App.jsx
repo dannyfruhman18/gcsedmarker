@@ -74,8 +74,13 @@ export default function App() {
     () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
   )
+  const hasSupabaseConfig = !SUPABASE_CONFIG_ERROR
 
   const loadSessions = useCallback(async () => {
+    if (!hasSupabaseConfig) {
+      return []
+    }
+
     if (sessionsControllerRef.current) {
       sessionsControllerRef.current.abort()
     }
@@ -130,10 +135,14 @@ export default function App() {
         setLoadingSessions(false)
       }
     }
-  }, [])
+  }, [hasSupabaseConfig])
 
   const loadSubscriptions = useCallback(async (email = '', options = {}) => {
     const { updateRecentSubscriptions = true } = options
+
+    if (!hasSupabaseConfig) {
+      return null
+    }
 
     if (subscriptionsControllerRef.current) {
       subscriptionsControllerRef.current.abort()
@@ -200,7 +209,7 @@ export default function App() {
         setLoadingSubscriptions(false)
       }
     }
-  }, [])
+  }, [hasSupabaseConfig])
 
   const refreshSubscriptionStatus = useCallback(async () => {
     const email = normalizedSubscriptionEmail
@@ -324,7 +333,11 @@ export default function App() {
   }
 
   async function handleMark() {
-    setError(null)
+    if (hasSupabaseConfig) {
+      setError(null)
+    } else {
+      setError(SUPABASE_CONFIG_ERROR)
+    }
     setSubscriptionsError(null)
 
     const trimmedQuestion = questionText.trim()
@@ -347,6 +360,13 @@ export default function App() {
     if (!trimmedAnswer) {
       setMarkResult(null)
       setError('Add a student answer, essay, or working before marking.')
+      return
+    }
+
+    const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
+
+    if (!hasSupabaseConfig) {
+      setMarkResult(analyzer(answerText, topBand))
       return
     }
 
@@ -404,7 +424,6 @@ export default function App() {
         return
       }
 
-      const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
       const result = analyzer(answerText, topBand)
       if (!mountedRef.current) return
       setMarkResult(result)
@@ -418,7 +437,7 @@ export default function App() {
             mode,
             question_text: questionText,
             answer_text: answerText,
-            upload_name: uploadName,
+            upload_name,
             score: result.score,
             feedback: result,
           },
@@ -601,7 +620,7 @@ export default function App() {
           </div>
 
           <div className="dropzone">
-            <input id="upload" type="file" accept="image/*" onChange={(e) => void handleFileChange(e.target.files?.[0])} />
+            <input id="upload" className="visually-hidden" type="file" accept="image/*" onChange={(e) => void handleFileChange(e.target.files?.[0])} />
             <label htmlFor="upload" className="upload-button">
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
