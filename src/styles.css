@@ -51,6 +51,9 @@ button, select, textarea, input {
   font: inherit;
   min-width: 0;
 }
+button {
+  touch-action: manipulation;
+}
 button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
@@ -78,7 +81,7 @@ button:disabled:hover {
   min-height: 100dvh;
   height: auto;
   margin: 0 auto;
-  padding: 20px 14px 40px;
+  padding: 20px 14px 48px;
 }
 
 .hero,
@@ -272,6 +275,7 @@ textarea { resize: vertical; min-height: 110px; }
   border-radius: 14px;
   padding: 14px 18px;
   cursor: pointer;
+  touch-action: manipulation;
 }
 .panel-header .secondary {
   margin-top: 0;
@@ -297,6 +301,7 @@ textarea { resize: vertical; min-height: 110px; }
   transition: all 0.2s;
   margin-top: 4px;
   margin-left: auto;
+  touch-action: manipulation;
 }
 .clear-button:hover {
   background: var(--surface-soft-hover);
@@ -409,7 +414,7 @@ textarea { resize: vertical; min-height: 110px; }
 }
 @media (max-width: 780px) {
   .app-shell {
-    padding: 12px 10px 28px;
+    padding: 12px 10px 36px;
   }
 
   .stat-row,
@@ -443,7 +448,7 @@ textarea { resize: vertical; min-height: 110px; }
 }
 @media (max-width: 420px) {
   .app-shell {
-    padding: 10px 8px 20px;
+    padding: 10px 8px 28px;
   }
 
   .hero,
@@ -472,6 +477,10 @@ textarea { resize: vertical; min-height: 110px; }
   }
 }
 @media (max-width: 320px) {
+  .app-shell {
+    padding: 10px 8px 24px;
+  }
+
   .hero h1 {
     font-size: 1.28rem;
   }
