@@ -129,20 +129,21 @@ async function supabaseRequest(path, options = {}, signal) {
 }
 
 function scoreEssay(answer, topBand) {
-  if (typeof answer !== 'string') {
+  const text = typeof answer === 'string' ? answer.trim() : ''
+
+  if (!text) {
     return {
       maxMarks: topBand ? 4 : 3,
       score: 0,
-      ao1: ['No valid essay answer was provided. Please enter text to receive feedback.'],
-      ao2: ['Essay feedback only works with text input.'],
-      ao3: ['Paste or type a student response so the marker can analyse it.'],
+      ao1: ['You are ready to start — paste a student response and we will help shape it into stronger AO1 evidence.'],
+      ao2: ['Even a short answer is enough to begin; adding more detail will unlock clearer AO2 feedback.'],
+      ao3: ['Once the response is pasted in, we can point out where judgement and evaluation can be strengthened.'],
       summary: topBand
-        ? 'Top Band mode needs a valid essay response to analyse.'
-        : 'Enter a text answer to receive essay feedback.',
+        ? 'Top Band mode works best once an essay response is pasted in.'
+        : 'Paste a response and we will give you encouraging, step-by-step essay feedback.',
     }
   }
 
-  const text = answer.trim()
   const length = text.split(/\s+/).filter(Boolean).length
   const ao1 = []
   const ao2 = []
@@ -155,7 +156,7 @@ function scoreEssay(answer, topBand) {
   } else if (length > 0) {
     ao1.push('Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
   } else {
-    ao1.push('No answer entered yet — add factual detail and examples.')
+    ao1.push('You have a good starting point — add factual detail and examples to build your answer.')
   }
 
   if (/\b(because|therefore|this shows|consequently|as a result|proves|suggests)\b/i.test(text)) {
@@ -191,21 +192,22 @@ function scoreEssay(answer, topBand) {
 }
 
 function scoreMathsScience(answer, topBand) {
-  if (typeof answer !== 'string') {
+  const text = typeof answer === 'string' ? answer.trim() : ''
+
+  if (!text) {
     return {
       maxMarks: topBand ? 5 : 4,
       score: 0,
-      ao1: ['No valid answer was provided. Please enter text to receive method-mark feedback.'],
-      ao2: ['Maths/science feedback only works with text input.'],
-      ao3: ['Paste or type the working, calculation steps, or final answer.'],
+      ao1: ['You are ready to begin — paste the working or final answer and we will help identify the method marks.'],
+      ao2: ['A few steps are enough to start; adding them will make the process feedback more precise.'],
+      ao3: ['Once the answer is in, we can point out the units, scientific idea, or conclusion that will strengthen the response.'],
       summary: topBand
-        ? 'Top Band mode needs a valid maths/science response to analyse.'
-        : 'Enter working or an answer to receive method-mark feedback.',
+        ? 'Top Band mode works best once a maths/science response is pasted in.'
+        : 'Paste working or an answer and we will give you encouraging method-mark feedback.',
       extra: [],
     }
   }
 
-  const text = answer.trim()
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
   const methodMarks = []
   const marks = new Set()
@@ -216,7 +218,7 @@ function scoreMathsScience(answer, topBand) {
   } else if (text) {
     methodMarks.push('Show the steps you used, not just the final answer.')
   } else {
-    methodMarks.push('Enter your working or answer to get method-mark feedback.')
+    methodMarks.push('You are off to a good start — add your working or final answer to unlock feedback.')
   }
 
   if (/=|→|=>|\bsubstitut(e|ion)\b|\bcalculate\b|\bshow\b/i.test(text)) {
@@ -306,9 +308,6 @@ function App() {
     () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
   )
-  const activeSubscription = useMemo(() => {
-    return subscriptionHasActiveAccess(recentSubscriptions, normalizedSubscriptionEmail)
-  }, [recentSubscriptions, normalizedSubscriptionEmail])
 
   useEffect(() => {
     return () => {
@@ -479,20 +478,27 @@ function App() {
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
 
-    if (hasSubscriptionEmail && !EMAIL_ADDRESS_REGEX.test(normalizedMarkEmail)) {
-      setError('Add a valid email address before marking, or leave it blank for demo mode.')
+    if (!trimmedQuestion && !trimmedAnswer) {
+      setMarkResult(null)
+      setError('Add a question and an answer before marking.')
       return
     }
 
-    if (!trimmedQuestion && !trimmedAnswer) {
-      setMarkResult({
-        score: 0,
-        maxMarks: topBand ? 5 : 4,
-        summary: 'Add a question or an answer before marking.',
-        ao1: ['Upload a question, paste the prompt, or enter a student answer so the app has something to mark.'],
-        ao2: [],
-        ao3: [],
-      })
+    if (!trimmedQuestion) {
+      setMarkResult(null)
+      setError('Add a question or prompt before marking so the answer has context.')
+      return
+    }
+
+    if (!trimmedAnswer) {
+      setMarkResult(null)
+      setError('Add a student answer, essay, or working before marking.')
+      return
+    }
+
+    if (hasSubscriptionEmail && !EMAIL_ADDRESS_REGEX.test(normalizedMarkEmail)) {
+      setMarkResult(null)
+      setError('Add a valid email address before marking, or leave it blank for demo mode.')
       return
     }
 
@@ -504,21 +510,15 @@ function App() {
       if (!mountedRef.current) return
 
       const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
-      const hasActiveSubscription = !hasSubscriptionEmail
-        ? true
-        : subscriptionLoadFailed
-          ? activeSubscription
-          : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
-
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && subscriptionLoadFailed) {
-        const message = 'Subscription validation failed. Please try again before marking.'
+        const message = 'Subscription status could not be verified. Please refresh status and try again.'
         if (mountedRef.current) {
           setError(message)
           setMarkResult({
             score: 0,
             maxMarks: topBand ? 5 : 4,
             summary: message,
-            ao1: ['Unable to verify subscription status right now. Please retry or refresh status.'],
+            ao1: ['We could not confirm subscription access just now. Please refresh status and try again.'],
             ao2: [],
             ao3: [],
           })
@@ -526,7 +526,11 @@ function App() {
         return
       }
 
-      if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !subscriptionLoadFailed && !hasActiveSubscription) {
+      const hasActiveSubscription = !hasSubscriptionEmail
+        ? true
+        : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
+
+      if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !hasActiveSubscription) {
         if (mountedRef.current) {
           setMarkResult({
             score: 0,
