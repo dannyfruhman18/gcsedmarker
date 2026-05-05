@@ -132,7 +132,9 @@ export default function App() {
     }
   }, [])
 
-  const loadSubscriptions = useCallback(async (email = '') => {
+  const loadSubscriptions = useCallback(async (email = '', options = {}) => {
+    const { updateRecentSubscriptions = true } = options
+
     if (subscriptionsControllerRef.current) {
       subscriptionsControllerRef.current.abort()
     }
@@ -172,7 +174,9 @@ export default function App() {
         return nextRows
       }
 
-      setRecentSubscriptions(nextRows)
+      if (updateRecentSubscriptions) {
+        setRecentSubscriptions(nextRows)
+      }
       setSubscriptionsError(null)
       return nextRows
     } catch (err) {
@@ -197,6 +201,27 @@ export default function App() {
       }
     }
   }, [])
+
+  const refreshSubscriptionStatus = useCallback(async () => {
+    const email = normalizedSubscriptionEmail
+
+    if (!email) {
+      setSubscriptionResult('Add a subscriber email to check subscription status.')
+      return
+    }
+
+    const rows = await loadSubscriptions(email, { updateRecentSubscriptions: false })
+    if (rows === null) {
+      return
+    }
+
+    const hasActiveSubscription = subscriptionHasActiveAccess(rows, email)
+    setSubscriptionResult(
+      hasActiveSubscription
+        ? 'An active subscription was found for this email.'
+        : 'No active subscription was found for this email.',
+    )
+  }, [loadSubscriptions, normalizedSubscriptionEmail])
 
   useEffect(() => {
     if (SUPABASE_CONFIG_ERROR && !configErrorLoggedRef.current) {
@@ -237,6 +262,7 @@ export default function App() {
       if (uploadPreview) {
         URL.revokeObjectURL(uploadPreview)
       }
+      setQuestionText('')
       setUploadName('')
       setUploadPreview('')
       setOcrLoading(false)
@@ -288,6 +314,7 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       console.error('OCR failed while reading uploaded question:', err)
+      setQuestionText('')
       setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
     } finally {
       if (isLatestUpload() && mountedRef.current) {
@@ -338,7 +365,7 @@ export default function App() {
     setMarking(true)
     try {
       const refreshedSubscriptions = hasSubscriptionEmail
-        ? await loadSubscriptions(normalizedMarkEmail)
+        ? await loadSubscriptions(normalizedMarkEmail, { updateRecentSubscriptions: false })
         : []
       if (!mountedRef.current) return
 
@@ -466,7 +493,7 @@ export default function App() {
         stripeWindow.location.href = STRIPE_PAYMENT_LINK
       }
 
-      await loadSubscriptions(email)
+      await loadSubscriptions()
       if (!mountedRef.current) return
 
       setError(null)
@@ -686,7 +713,7 @@ export default function App() {
             <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
               {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? 'Open Stripe checkout' : 'Create subscription record'}
             </button>
-            <button className="secondary" onClick={() => void loadSubscriptions(normalizedSubscriptionEmail)}>
+            <button className="secondary" onClick={() => void refreshSubscriptionStatus()}>
               Refresh Status
             </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
@@ -733,7 +760,7 @@ export default function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent subscriptions</h2>
-          <button className="secondary" onClick={() => void loadSubscriptions(normalizedSubscriptionEmail)} disabled={loadingSubscriptions}>
+          <button className="secondary" onClick={() => void loadSubscriptions()} disabled={loadingSubscriptions}>
             {loadingSubscriptions ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
