@@ -70,6 +70,29 @@ function maskEmail(email) {
   return hasDomain ? `${visibleLocal}@${domain || '***'}` : visibleLocal
 }
 
+function normalizeEmail(value) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function mergeHistoryRows(existingRows, incomingRows) {
+  const mergedRows = new Map()
+  for (const row of [...(Array.isArray(existingRows) ? existingRows : []), ...(Array.isArray(incomingRows) ? incomingRows : [])]) {
+    if (!row || row.id == null) continue
+    mergedRows.set(row.id, row)
+  }
+
+  return Array.from(mergedRows.values()).sort((a, b) => {
+    const aTime = new Date(a?.created_at || 0).getTime()
+    const bTime = new Date(b?.created_at || 0).getTime()
+    return bTime - aTime
+  })
+}
+
+function formatDateTime(value) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Unknown date' : date.toLocaleString()
+}
+
 async function supabaseRequest(path, options = {}) {
   if (SUPABASE_CONFIG_ERROR) {
     throw new Error(SUPABASE_CONFIG_ERROR)
@@ -242,14 +265,14 @@ function App() {
 
   const boardLink = useMemo(() => BOARD_LINKS[board], [board])
   const normalizedSubscriptionEmail = useMemo(
-    () => subscriptionEmail.trim().toLowerCase(),
+    () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
   )
   const activeSubscription = useMemo(() => {
     if (!normalizedSubscriptionEmail) return false
 
     return recentSubscriptions.some((row) => {
-      const rowEmail = String(row.email || '').trim().toLowerCase()
+      const rowEmail = normalizeEmail(row.email)
       const rowStatus = String(row.status || '').trim().toLowerCase()
       return (
         rowEmail === normalizedSubscriptionEmail &&
@@ -278,11 +301,14 @@ function App() {
         method: 'GET',
         headers: { Accept: 'application/json' },
       })
-      setRecentSessions(rows ?? [])
+      const nextRows = Array.isArray(rows) ? rows : []
+      setRecentSessions(nextRows)
       setSessionsError(null)
+      return nextRows
     } catch (err) {
       console.error(err)
       setSessionsError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
+      return []
     } finally {
       setLoadingSessions(false)
     }
@@ -290,8 +316,8 @@ function App() {
 
   async function loadSubscriptions(email = '') {
     try {
-      const normalizedEmail = String(email ?? '').trim().toLowerCase()
-      const emailFilter = normalizedEmail ? `&email=eq.${encodeURIComponent(normalizedEmail)}` : ''
+      const normalizedEmail = normalizeEmail(email)
+      const emailFilter = normalizedEmail ? `&email=ilike.${encodeURIComponent(normalizedEmail)}` : ''
       // TODO: Query subscriptions by email/status on the server instead of loading a broad recent history for better scale.
       const rows = await supabaseRequest(
         `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200${emailFilter}`,
@@ -300,9 +326,10 @@ function App() {
           headers: { Accept: 'application/json' },
         },
       )
-      setRecentSubscriptions(rows ?? [])
+      const nextRows = Array.isArray(rows) ? rows : []
+      setRecentSubscriptions((currentRows) => (normalizedEmail ? mergeHistoryRows(currentRows, nextRows) : nextRows))
       setSubscriptionsError(null)
-      return rows ?? []
+      return nextRows
     } catch (err) {
       console.error(err)
       setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
@@ -354,7 +381,7 @@ function App() {
       const refreshedSubscriptions = await loadSubscriptions(normalizedSubscriptionEmail)
       const hasActiveSubscription = normalizedSubscriptionEmail
         ? refreshedSubscriptions.some((row) => {
-            const rowEmail = String(row.email || '').trim().toLowerCase()
+            const rowEmail = normalizeEmail(row.email)
             const rowStatus = String(row.status || '').trim().toLowerCase()
             return (
               rowEmail === normalizedSubscriptionEmail &&
@@ -409,7 +436,7 @@ function App() {
   }
 
   async function handleSubscription() {
-    const email = subscriptionEmail.trim().toLowerCase()
+    const email = normalizeEmail(subscriptionEmail)
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setSubscriptionResult('Add a valid email address.')
       return
@@ -660,7 +687,7 @@ function App() {
                 </div>
                 <div>
                   <strong>{session.score ?? 0}</strong>
-                  <span>{new Date(session.created_at).toLocaleString()}</span>
+                  <span>{formatDateTime(session.created_at)}</span>
                 </div>
               </article>
             ))
@@ -685,7 +712,7 @@ function App() {
                 </div>
                 <div>
                   <strong>{subscription.status}</strong>
-                  <span>{new Date(subscription.created_at).toLocaleString()}</span>
+                  <span>{formatDateTime(subscription.created_at)}</span>
                 </div>
               </article>
             ))
