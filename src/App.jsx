@@ -141,11 +141,9 @@ export default function App() {
 
   async function loadSubscriptions(email = '') {
     const normalizedEmail = normalizeEmail(email)
-    if (!normalizedEmail) {
-      setRecentSubscriptions([])
-      setSubscriptionsError(null)
-      return []
-    }
+    const subscriptionsPath = normalizedEmail
+      ? `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
+      : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=5'
 
     const controller = new AbortController()
     requestControllersRef.current.add(controller)
@@ -158,7 +156,6 @@ export default function App() {
       }
 
       setLoadingSubscriptions(true)
-      const subscriptionsPath = `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
       const rows = await supabaseRequest(
         subscriptionsPath,
         {
