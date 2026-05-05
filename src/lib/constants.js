@@ -7,7 +7,7 @@ export const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? '
 
 export const SUPABASE_CONFIG_ERROR =
   !SUPABASE_URL || !SUPABASE_ANON_KEY
-    ? 'Supabase is not configured. Set both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to load and save data.'
+    ? 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment, then restart the app to enable loading and saving data.'
     : null
 
 export const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
