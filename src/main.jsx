@@ -8,6 +8,7 @@ import './styles.css'
 // - VITE_SUPABASE_ANON_KEY
 // - VITE_STRIPE_PAYMENT_LINK (optional; enables the Stripe checkout flow)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_BASE_URL = SUPABASE_URL ? SUPABASE_URL.replace(/\/+$/, '') : ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
 const SUPABASE_CONFIG_ERROR =
@@ -103,7 +104,7 @@ async function supabaseRequest(path, options = {}, signal) {
     throw new Error(SUPABASE_CONFIG_ERROR)
   }
 
-  const response = await fetch(`${SUPABASE_URL}${path}`, {
+  const response = await fetch(`${SUPABASE_BASE_URL}${path}`, {
     ...options,
     signal: signal ?? options.signal,
     headers: {
@@ -373,6 +374,13 @@ function App() {
   }
 
   async function loadSubscriptions(email = '') {
+    const normalizedEmail = normalizeEmail(email)
+    if (!normalizedEmail) {
+      setRecentSubscriptions([])
+      setSubscriptionsError(null)
+      return []
+    }
+
     const controller = new AbortController()
     requestControllersRef.current.add(controller)
 
@@ -384,15 +392,16 @@ function App() {
       }
 
       setLoadingSubscriptions(true)
-      const normalizedEmail = normalizeEmail(email)
-      const subscriptionsPath = normalizedEmail
-        ? `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
-        : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200'
+      const subscriptionsPath = `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
       // TODO: Query subscriptions by email/status on the server instead of loading a broad recent history for better scale.
-      const rows = await supabaseRequest(subscriptionsPath, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      }, controller.signal)
+      const rows = await supabaseRequest(
+        subscriptionsPath,
+        {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        },
+        controller.signal,
+      )
       const nextRows = Array.isArray(rows) ? rows : []
       if (!mountedRef.current || controller.signal.aborted) return nextRows
 
@@ -595,6 +604,21 @@ function App() {
       return
     }
 
+    let stripeWindow = null
+    let stripePopupBlocked = false
+
+    if (STRIPE_PAYMENT_LINK) {
+      stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
+      stripePopupBlocked = !stripeWindow
+      if (stripeWindow) {
+        try {
+          stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
+        } catch {
+          // Ignore cross-browser about:blank write issues.
+        }
+      }
+    }
+
     setSubmittingSubscription(true)
     try {
       await supabaseRequest('/rest/v1/subscriptions', {
@@ -613,10 +637,8 @@ function App() {
 
       if (!mountedRef.current) return
 
-      let stripePopupBlocked = false
-      if (STRIPE_PAYMENT_LINK) {
-        const stripeWindow = window.open(STRIPE_PAYMENT_LINK, '_blank', 'noreferrer')
-        stripePopupBlocked = !stripeWindow
+      if (STRIPE_PAYMENT_LINK && stripeWindow && !stripeWindow.closed) {
+        stripeWindow.location.href = STRIPE_PAYMENT_LINK
       }
 
       await loadSubscriptions(normalizedSubscriptionEmail)
@@ -631,6 +653,10 @@ function App() {
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.'
       )
     } catch (err) {
+      if (stripeWindow && !stripeWindow.closed) {
+        stripeWindow.close()
+      }
+
       if (!mountedRef.current) return
 
       const message = `Subscription save failed: ${err?.message || String(err)}`

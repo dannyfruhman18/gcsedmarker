@@ -352,7 +352,8 @@ textarea { resize: vertical; min-height: 110px; }
 
   .brand-row {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+    text-align: center;
   }
 
   .history-item {
