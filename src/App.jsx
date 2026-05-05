@@ -78,12 +78,56 @@ export default function App() {
   const subscriptionsControllerRef = useRef(null)
   const configErrorLoggedRef = useRef(false)
   const workerRef = useRef(null)
+  const workerInitPromiseRef = useRef(null)
+  const ocrProgressHandlerRef = useRef(null)
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
     () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
   )
+
+  const ensureOcrWorker = useCallback(async () => {
+    if (workerRef.current) {
+      return workerRef.current
+    }
+
+    if (!workerInitPromiseRef.current) {
+      workerInitPromiseRef.current = createWorker('eng', 1, {
+        logger: (message) => {
+          if (typeof ocrProgressHandlerRef.current === 'function') {
+            ocrProgressHandlerRef.current(message)
+          }
+        },
+      })
+        .then(async (worker) => {
+          if (!mountedRef.current) {
+            try {
+              await worker.terminate()
+            } catch (terminateErr) {
+              console.warn('OCR worker cleanup failed during initialization:', terminateErr)
+            }
+            throw new Error('OCR worker initialization was cancelled.')
+          }
+
+          workerRef.current = worker
+          return worker
+        })
+        .catch((err) => {
+          workerRef.current = null
+          throw err
+        })
+        .finally(() => {
+          workerInitPromiseRef.current = null
+        })
+    }
+
+    const worker = await workerInitPromiseRef.current
+    if (!workerRef.current) {
+      workerRef.current = worker
+    }
+    return worker
+  }, [])
 
   const loadSessions = useCallback(async () => {
     if (sessionsControllerRef.current) {
@@ -259,6 +303,8 @@ export default function App() {
       subscriptionsControllerRef.current?.abort()
       requestControllersRef.current.forEach((controller) => controller.abort())
       requestControllersRef.current.clear()
+      ocrProgressHandlerRef.current = null
+      workerInitPromiseRef.current = null
       if (workerRef.current) {
         void workerRef.current.terminate().catch(() => {})
         workerRef.current = null
@@ -311,55 +357,47 @@ export default function App() {
       URL.revokeObjectURL(uploadPreview)
     }
 
-    if (workerRef.current) {
-      try {
-        await workerRef.current.terminate()
-      } catch (terminateErr) {
-        console.warn('Previous OCR worker could not be terminated:', terminateErr)
-      } finally {
-        workerRef.current = null
-      }
-    }
-
     const nextPreview = URL.createObjectURL(file)
     setOcrLoading(true)
     setUploadName(file.name)
     setUploadPreview(nextPreview)
     setOcrStatus('Reading text from the image...')
 
-    let worker = null
+    ocrProgressHandlerRef.current = (message) => {
+      if (!mountedRef.current || !isLatestUpload()) {
+        return
+      }
+
+      if (typeof message?.progress === 'number') {
+        const percent = Math.max(0, Math.min(100, Math.round(message.progress * 100)))
+        setOcrStatus(`OCR: ${percent}%`)
+        return
+      }
+
+      if (message?.status) {
+        setOcrStatus(`OCR: ${message.status}`)
+      }
+    }
 
     try {
-      worker = await createWorker('eng', 1, {
-        logger: (message) => {
-          if (!mountedRef.current || !isLatestUpload()) {
-            return
-          }
+      const worker = await ensureOcrWorker()
+      if (!mountedRef.current || !isLatestUpload()) return
 
-          if (typeof message?.progress === 'number') {
-            const percent = Math.max(0, Math.min(100, Math.round(message.progress * 100)))
-            setOcrStatus(`OCR: ${percent}%`)
-            return
-          }
-
-          if (message?.status) {
-            setOcrStatus(`OCR: ${message.status}`)
+      const extracted = await extractQuestionTextFromImage(
+        file,
+        (status) => {
+          if (mountedRef.current && isLatestUpload()) {
+            setOcrStatus(status)
           }
         },
-      })
-
-      workerRef.current = worker
-
-      const extracted = await extractQuestionTextFromImage(file, (status) => {
-        if (mountedRef.current && isLatestUpload()) {
-          setOcrStatus(status)
-        }
-      }, worker)
+        worker,
+      )
       if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
         const extractedWordCount = extracted.split(/\s+/).filter(Boolean).length
-        if (questionTextVersionRef.current === questionTextVersionAtStart) {
+        if (questionTextRefe
+rence.current === questionTextVersionAtStart) {
           setQuestionText(extracted)
           setOcrStatus(`Text read from image (${extractedWordCount} words).`)
         } else {
@@ -367,27 +405,25 @@ export default function App() {
             `OCR complete (${extractedWordCount} words), but your manual question edits were kept.`,
           )
         }
+      } else if (questionTextVersionRef.current === questionTextVersionAtStart) {
+        setQuestionText('')
+        setOcrStatus('No clear text found. Question text was cleared, so you can type it manually.')
       } else {
-        setOcrStatus('No clear text found. You can type or paste the question manually.')
+        setOcrStatus('No clear text found. Your manual question edits were kept.')
       }
     } catch (err) {
       if (!mountedRef.current || !isLatestUpload()) return
 
       console.error('OCR failed while reading uploaded question:', err)
-      setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
-    } finally {
-      if (worker && workerRef.current === worker) {
-        try {
-          await worker.terminate()
-        } catch (terminateErr) {
-          console.warn('OCR worker cleanup failed:', terminateErr)
-        } finally {
-          workerRef.current = null
-        }
+      if (workerRef.current) {
+        setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
+      } else {
+        setOcrStatus('OCR could not start. Please try again or reload the page.')
       }
-
+    } finally {
       if (isLatestUpload() && mountedRef.current) {
         setOcrLoading(false)
+        ocrProgressHandlerRef.current = null
       }
     }
   }
