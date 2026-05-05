@@ -52,6 +52,7 @@ export function scoreEssay(answer, topBand) {
 
   if (topBand) {
     if (length > 150) {
+      score += 1
       ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
       ao2.push('Top Band mode: use linked chains of reasoning and compare alternatives instead of listing points.')
       ao3.push('Top Band mode: refine paragraph sequencing, counterargument, and conclusion flow to maximise impact.')
