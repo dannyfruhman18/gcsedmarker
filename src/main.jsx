@@ -111,7 +111,7 @@ async function supabaseRequest(path, options = {}) {
   const data = safeParseJson(text)
 
   if (!response.ok) {
-    const message=
+    const message =
       typeof data === 'string'
         ? data
         : data?.message || data?.error_description || data?.hint || response.statusText
@@ -265,7 +265,7 @@ function App() {
 
   const uploadRequestIdRef = useRef(0)
 
-  const boardLink = useMemo(() => BOARD_LINKS[board], [board])
+  const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
     () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
@@ -723,15 +723,15 @@ function App() {
         </div>
         <div className="history-list">
           {recentSessions.length ? (
-            recentSessions.map((session) => (
-              <article key={session.id} className="history-item">
+            recentSessions.map((session, index) => (
+              <article key={session?.id ?? `session-${index}`} className="history-item">
                 <div>
-                  <strong>{session.exam_board}</strong>
-                  <span>{session.mode}</span>
+                  <strong>{session?.exam_board ?? 'Unknown board'}</strong>
+                  <span>{session?.mode ?? 'Unknown mode'}</span>
                 </div>
                 <div>
-                  <strong>{session.score ?? 0}</strong>
-                  <span>{formatDateTime(session.created_at)}</span>
+                  <strong>{session?.score ?? 0}</strong>
+                  <span>{formatDateTime(session?.created_at)}</span>
                 </div>
               </article>
             ))
@@ -750,15 +750,15 @@ function App() {
         </div>
         <div className="history-list">
           {recentSubscriptions.length ? (
-            recentSubscriptions.map((subscription) => (
-              <article key={subscription.id} className="history-item">
+            recentSubscriptions.map((subscription, index) => (
+              <article key={subscription?.id ?? `subscription-${index}`} className="history-item">
                 <div>
-                  <strong>{maskEmail(subscription.email)}</strong>
-                  <span>{subscription.plan}</span>
+                  <strong>{maskEmail(subscription?.email)}</strong>
+                  <span>{subscription?.plan ?? 'Unknown plan'}</span>
                 </div>
                 <div>
-                  <strong>{subscription.status}</strong>
-                  <span>{formatDateTime(subscription.created_at)}</span>
+                  <strong>{subscription?.status ?? 'Unknown status'}</strong>
+                  <span>{formatDateTime(subscription?.created_at)}</span>
                 </div>
               </article>
             ))
@@ -771,7 +771,13 @@ function App() {
   )
 }
 
-createRoot(document.getElementById('root')).render(
+const rootElement = document.getElementById('root')
+
+if (!rootElement) {
+  throw new Error('GCSEmarker cannot start: missing root element #root.')
+}
+
+createRoot(rootElement).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,

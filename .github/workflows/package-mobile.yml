@@ -16,7 +16,8 @@ jobs:
           cache: npm
       - run: npm install
       - run: npm run build
-      - run: npm run cap:sync
+      # Removed `npm run cap:sync` because this repo does not include committed native folders
+      # (for example `ios/` or `android/`), so that step would fail in CI.
       - uses: actions/upload-artifact@v4
         with:
           name: gcsedmarker-web-build
