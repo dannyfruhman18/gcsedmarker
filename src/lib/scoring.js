@@ -384,7 +384,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
       score += 1
       addMethodMark(
         matchedSnippet
-          ? `Question-aware check: you reuse key terms such as ${matchedSnippet}, which keeps the working on task.`,
+          ? `Question-aware check: you reuse key terms such as ${matchedSnippet}, which keeps the working on task.`
           : 'Question-aware check: you reuse key terms from the prompt, which keeps the working on task.',
       )
     } else {
@@ -409,13 +409,9 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   if (questionAnalysis.commandWord) {
     if (questionAnalysis.usesCommandStyle) {
       score += 1
-      addMethodMark(
-        `The prompt asks you to ${questionAnalysis.commandWord}, and your response shows that process clearly.`,
-      )
+      addMethodMark(`The prompt asks you to ${questionAnalysis.commandWord}, and your response shows that process clearly.`)
     } else {
-      addMethodMark(
-        `The prompt asks you to ${questionAnalysis.commandWord}, so make that method style more obvious in your working.`,
-      )
+      addMethodMark(`The prompt asks you to ${questionAnalysis.commandWord}, so make that method style more obvious in your working.`)
     }
   }
 
