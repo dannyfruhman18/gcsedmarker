@@ -279,6 +279,12 @@ textarea { resize: vertical; min-height: 110px; }
   display: grid;
   gap: 10px;
 }
+.history-panel .history-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
 .history-item {
   display: flex;
   justify-content: space-between;
@@ -316,15 +322,15 @@ textarea { resize: vertical; min-height: 110px; }
 .tier-card span { color: var(--color-brand); }
 .result-note { color: var(--color-text-soft); margin: 0; }
 .board-links { text-align: right; }
-@media (max-width: 950px) and (min-width: 781px) {
+@media (max-width: 1100px) and (min-width: 781px) {
   .stat-row {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .control-row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .toggle {
-    grid-column: span 2;
+    grid-column: 1 / -1;
   }
   .subscription-grid {
     grid-template-columns: 1fr;
@@ -339,6 +345,10 @@ textarea { resize: vertical; min-height: 110px; }
   .control-row,
   .subscription-grid {
     grid-template-columns: 1fr;
+  }
+
+  .history-panel .history-list {
+    max-height: 280px;
   }
 
   .panel-header {
