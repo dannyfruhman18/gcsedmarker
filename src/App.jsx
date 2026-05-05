@@ -266,15 +266,15 @@ export default function App() {
 
     const rows = await loadSubscriptions(email, { updateRecentSubscriptions: false })
     if (rows === null) {
-      return
+      setSubscriptionResult('Failed to refresh status.')
+    } else {
+      const hasActiveSubscription = subscriptionHasActiveAccess(rows, email)
+      setSubscriptionResult(
+        hasActiveSubscription
+          ? 'An active subscription was found for this email.'
+          : 'No active subscription was found for this email.',
+      )
     }
-
-    const hasActiveSubscription = subscriptionHasActiveAccess(rows, email)
-    setSubscriptionResult(
-      hasActiveSubscription
-        ? 'An active subscription was found for this email.'
-        : 'No active subscription was found for this email.',
-    )
   }, [loadSubscriptions, normalizedSubscriptionEmail])
 
   const clearUpload = useCallback(() => {
@@ -435,48 +435,55 @@ export default function App() {
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
+    const isOwnerEmail = normalizedMarkEmail === 'markfruhman@gmail.com'
 
     if (!trimmedQuestion && !trimmedAnswer) {
       setMarkResult(null)
+      window.scrollTo(0, 0)
       setError('Add a question and an answer before marking.')
       return
     }
 
     if (!trimmedQuestion) {
       setMarkResult(null)
+      window.scrollTo(0, 0)
       setError('Add a question or prompt before marking so the answer has context.')
       return
     }
 
     if (!trimmedAnswer) {
       setMarkResult(null)
+      window.scrollTo(0, 0)
       setError('Add a student answer, essay, or working before marking.')
       return
     }
 
     if (STRIPE_PAYMENT_LINK && !hasSubscriptionEmail) {
       setMarkResult(null)
+      window.scrollTo(0, 0)
       setError('Add a subscriber email before marking when Stripe payments are enabled.')
       return
     }
 
     if (hasSubscriptionEmail && !EMAIL_ADDRESS_REGEX.test(normalizedMarkEmail)) {
       setMarkResult(null)
+      window.scrollTo(0, 0)
       setError('Add a valid email address before marking, or leave it blank for demo mode.')
       return
     }
 
     setMarking(true)
     try {
-      const refreshedSubscriptions = hasSubscriptionEmail
+      const refreshedSubscriptions = hasSubscriptionEmail && !isOwnerEmail
         ? await loadSubscriptions(normalizedMarkEmail, { updateRecentSubscriptions: false })
         : []
       if (!mountedRef.current) return
 
-      const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
+      const subscriptionLoadFailed = hasSubscriptionEmail && !isOwnerEmail && refreshedSubscriptions === null
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && subscriptionLoadFailed) {
         const message = 'Subscription status could not be verified. Please refresh status and try again.'
         if (mountedRef.current) {
+          window.scrollTo(0, 0)
           setError(message)
           setMarkResult({
             score: 0,
@@ -492,7 +499,9 @@ export default function App() {
 
       const hasActiveSubscription = !hasSubscriptionEmail
         ? true
-        : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
+        : isOwnerEmail
+          ? true
+          : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
 
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !hasActiveSubscription) {
         if (mountedRef.current) {
@@ -541,6 +550,7 @@ export default function App() {
       console.error('Marking answer failed:', err)
       if (!mountedRef.current) return
 
+      window.scrollTo(0, 0)
       const message = `Supabase save failed. Check VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, network connectivity, and Supabase RLS or table permissions for marking_sessions/subscriptions. Original error: ${err?.message || String(err)}`
       setError(message)
       setMarkResult((current) => ({
@@ -569,13 +579,24 @@ export default function App() {
     let stripePopupBlocked = false
 
     if (STRIPE_PAYMENT_LINK) {
-      stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
+      try {
+        stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
+      } catch (popupOpenErr) {
+        console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
+      }
+
       stripePopupBlocked = !stripeWindow
-      if (stripeWindow) {
+      if (stripePopupBlocked) {
+        console.error('Stripe checkout popup was blocked or failed to open.', {
+          email,
+          plan: subscriptionPlan,
+          hasStripePaymentLink: Boolean(STRIPE_PAYMENT_LINK),
+        })
+      } else {
         try {
           stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
-        } catch {
-          // Ignore cross-browser about:blank write issues.
+        } catch (popupWriteErr) {
+          console.error('Stripe checkout popup opened, but writing the placeholder content failed.', popupWriteErr)
         }
       }
     }
@@ -599,7 +620,11 @@ export default function App() {
       if (!mountedRef.current) return
 
       if (STRIPE_PAYMENT_LINK && stripeWindow && !stripeWindow.closed) {
-        stripeWindow.location.href = STRIPE_PAYMENT_LINK
+        try {
+          stripeWindow.location.href = STRIPE_PAYMENT_LINK
+        } catch (popupRedirectErr) {
+          console.error('Stripe checkout popup opened, but redirecting to the payment link failed.', popupRedirectErr)
+        }
       }
 
       await loadSubscriptions()
@@ -615,6 +640,14 @@ export default function App() {
       )
     } catch (err) {
       console.error('Subscription save failed:', err)
+      console.error('Subscription popup state at failure:', {
+        email,
+        plan: subscriptionPlan,
+        stripePopupBlocked,
+        stripeWindowOpen: Boolean(stripeWindow),
+        stripeWindowClosed: stripeWindow ? stripeWindow.closed : null,
+        stripePaymentLinkConfigured: Boolean(STRIPE_PAYMENT_LINK),
+      })
       if (stripeWindow && !stripeWindow.closed) {
         stripeWindow.close()
       }
