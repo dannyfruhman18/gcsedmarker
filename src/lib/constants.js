@@ -16,7 +16,7 @@ export const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
   'active',
   'trialing',
   'paid',
-])
+]);
 export const MAX_VISIBLE_HISTORY_ROWS = 5
 
 export const BOARD_LINKS = {
