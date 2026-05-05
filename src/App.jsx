@@ -74,13 +74,8 @@ export default function App() {
     () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
   )
-  const hasSupabaseConfig = !SUPABASE_CONFIG_ERROR
 
   const loadSessions = useCallback(async () => {
-    if (!hasSupabaseConfig) {
-      return []
-    }
-
     if (sessionsControllerRef.current) {
       sessionsControllerRef.current.abort()
     }
@@ -135,14 +130,10 @@ export default function App() {
         setLoadingSessions(false)
       }
     }
-  }, [hasSupabaseConfig])
+  }, [])
 
   const loadSubscriptions = useCallback(async (email = '', options = {}) => {
     const { updateRecentSubscriptions = true } = options
-
-    if (!hasSupabaseConfig) {
-      return null
-    }
 
     if (subscriptionsControllerRef.current) {
       subscriptionsControllerRef.current.abort()
@@ -209,7 +200,7 @@ export default function App() {
         setLoadingSubscriptions(false)
       }
     }
-  }, [hasSupabaseConfig])
+  }, [])
 
   const refreshSubscriptionStatus = useCallback(async () => {
     const email = normalizedSubscriptionEmail
@@ -231,6 +222,18 @@ export default function App() {
         : 'No active subscription was found for this email.',
     )
   }, [loadSubscriptions, normalizedSubscriptionEmail])
+
+  const clearUpload = useCallback(() => {
+    if (uploadPreview) {
+      URL.revokeObjectURL(uploadPreview)
+    }
+
+    uploadRequestIdRef.current += 1
+    setUploadName('')
+    setUploadPreview('')
+    setOcrStatus('Upload an image and OCR will fill the question box.')
+    setOcrLoading(false)
+  }, [uploadPreview])
 
   useEffect(() => {
     if (SUPABASE_CONFIG_ERROR && !configErrorLoggedRef.current) {
@@ -258,6 +261,10 @@ export default function App() {
   }, [uploadPreview])
 
   useEffect(() => {
+    if (SUPABASE_CONFIG_ERROR) {
+      return
+    }
+
     void loadSessions()
     void loadSubscriptions()
   }, [loadSessions, loadSubscriptions])
@@ -267,15 +274,6 @@ export default function App() {
 
     const uploadRequestId = ++uploadRequestIdRef.current
     const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
-    const clearUploadState = () => {
-      if (uploadPreview) {
-        URL.revokeObjectURL(uploadPreview)
-      }
-      setQuestionText('')
-      setUploadName('')
-      setUploadPreview('')
-      setOcrLoading(false)
-    }
 
     const isImageType = Boolean(
       (file.type && file.type.startsWith('image/')) ||
@@ -283,13 +281,13 @@ export default function App() {
     )
 
     if (!isImageType) {
-      clearUploadState()
+      clearUpload()
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
     }
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      clearUploadState()
+      clearUpload()
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
     }
@@ -299,7 +297,6 @@ export default function App() {
     }
 
     const nextPreview = URL.createObjectURL(file)
-    setQuestionText('')
     setOcrLoading(true)
     setUploadName(file.name)
     setUploadPreview(nextPreview)
@@ -314,7 +311,17 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
-        setQuestionText(extracted)
+        setQuestionText((currentText) => {
+          const existingText = currentText.trim()
+          const extractedText = extracted.trim()
+
+          if (!existingText) return extractedText
+          if (!extractedText) return currentText
+
+          return `${existingText}
+
+${extractedText}`
+        })
         setOcrStatus(`Text read from image (${extracted.split(/\s+/).filter(Boolean).length} words).`)
       } else {
         setOcrStatus('No clear text found. You can type or paste the question manually.')
@@ -323,7 +330,6 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       console.error('OCR failed while reading uploaded question:', err)
-      setQuestionText('')
       setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
     } finally {
       if (isLatestUpload() && mountedRef.current) {
@@ -333,11 +339,7 @@ export default function App() {
   }
 
   async function handleMark() {
-    if (hasSupabaseConfig) {
-      setError(null)
-    } else {
-      setError(SUPABASE_CONFIG_ERROR)
-    }
+    setError(null)
     setSubscriptionsError(null)
 
     const trimmedQuestion = questionText.trim()
@@ -360,13 +362,6 @@ export default function App() {
     if (!trimmedAnswer) {
       setMarkResult(null)
       setError('Add a student answer, essay, or working before marking.')
-      return
-    }
-
-    const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
-
-    if (!hasSupabaseConfig) {
-      setMarkResult(analyzer(answerText, topBand))
       return
     }
 
@@ -424,6 +419,7 @@ export default function App() {
         return
       }
 
+      const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
       const result = analyzer(answerText, topBand)
       if (!mountedRef.current) return
       setMarkResult(result)
@@ -437,7 +433,7 @@ export default function App() {
             mode,
             question_text: questionText,
             answer_text: answerText,
-            upload_name,
+            upload_name: uploadName,
             score: result.score,
             feedback: result,
           },
@@ -620,13 +616,25 @@ export default function App() {
           </div>
 
           <div className="dropzone">
-            <input id="upload" className="visually-hidden" type="file" accept="image/*" onChange={(e) => void handleFileChange(e.target.files?.[0])} />
+            <input id="upload" type="file" accept="image/*" onChange={(e) => void handleFileChange(e.target.files?.[0])} />
             <label htmlFor="upload" className="upload-button">
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
             </label>
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
-            <p className="muted">{ocrStatus}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <p className="muted" style={{ margin: 0, flex: '1 1 220px' }}>{ocrStatus}</p>
+              {uploadPreview ? (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={clearUpload}
+                  style={{ width: 'auto', marginTop: 0, padding: '8px 12px' }}
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
             {uploadPreview ? <img className="preview" src={uploadPreview} alt="Uploaded question preview" /> : null}
           </div>
 

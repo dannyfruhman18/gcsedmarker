@@ -128,7 +128,7 @@ export function scoreMathsScience(answer, topBand) {
 
   if (/\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)) {
     marks.add('conclusion')
-    methodMarks.push('You are moving from working to a conclusion, which helps the final-mark award.')
+    methodMarks.push('Detected markers for a conclusion or final answer, which is key for top marks.')
   }
 
   if (topBand && text.length >= 100) {
