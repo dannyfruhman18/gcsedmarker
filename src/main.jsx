@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createWorker } from 'tesseract.js'
 import './styles.css'
@@ -277,6 +277,8 @@ function App() {
   const [sessionsError, setSessionsError] = useState(null)
   const [subscriptionsError, setSubscriptionsError] = useState(null)
 
+  const uploadRequestIdRef = useRef(0)
+
   const boardLink = useMemo(() => BOARD_LINKS[board], [board])
   const normalizedSubscriptionEmail = useMemo(
     () => normalizeEmail(subscriptionEmail),
@@ -325,7 +327,7 @@ function App() {
     try {
       setLoadingSubscriptions(true)
       const normalizedEmail = normalizeEmail(email)
-      const emailFilter = normalizedEmail ? `&email=ilike.${encodeURIComponent(normalizedEmail)}` : ''
+      const emailFilter = normalizedEmail ? `&email=eq.${encodeURIComponent(normalizedEmail)}` : ''
       // TODO: Query subscriptions by email/status on the server instead of loading a broad recent history for better scale.
       const rows = await supabaseRequest(
         `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200${emailFilter}`,
@@ -349,14 +351,25 @@ function App() {
 
   async function handleFileChange(file) {
     if (!file) return
+
+    const uploadRequestId = ++uploadRequestIdRef.current
+    const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
+
+    if (uploadPreview) {
+      URL.revokeObjectURL(uploadPreview)
+    }
+
+    const nextPreview = URL.createObjectURL(file)
     setQuestionText('')
     setOcrLoading(true)
     setUploadName(file.name)
-    setUploadPreview(URL.createObjectURL(file))
+    setUploadPreview(nextPreview)
     setOcrStatus('Reading text from the image...')
 
     try {
       const extracted = await extractQuestionTextFromImage(file, setOcrStatus)
+      if (!isLatestUpload()) return
+
       if (extracted) {
         setQuestionText(extracted)
         setOcrStatus(`Text read from image (${extracted.split(/\s+/).filter(Boolean).length} words).`)
@@ -364,10 +377,14 @@ function App() {
         setOcrStatus('No clear text found. You can type or paste the question manually.')
       }
     } catch (err) {
+      if (!isLatestUpload()) return
+
       console.error(err)
       setOcrStatus('OCR failed — please type the question manually.')
     } finally {
-      setOcrLoading(false)
+      if (isLatestUpload()) {
+        setOcrLoading(false)
+      }
     }
   }
 
@@ -397,6 +414,20 @@ function App() {
       const hasActiveSubscription = subscriptionLoadFailed
         ? activeSubscription
         : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedSubscriptionEmail)
+
+      if (STRIPE_PAYMENT_LINK && subscriptionLoadFailed) {
+        const message = 'Subscription validation failed. Please try again before marking.'
+        setError(message)
+        setMarkResult({
+          score: 0,
+          maxMarks: topBand ? 5 : 4,
+          summary: message,
+          ao1: ['Unable to verify subscription status right now. Please retry or refresh status.'],
+          ao2: [],
+          ao3: [],
+        })
+        return
+      }
 
       if (STRIPE_PAYMENT_LINK && !subscriptionLoadFailed && !hasActiveSubscription) {
         setMarkResult({
