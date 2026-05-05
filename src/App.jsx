@@ -311,7 +311,7 @@ export default function App() {
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
       clearUpload()
-      setOcrStatus('File is too large. Please upload an image smaller than 5MB.').
+      setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
     }
 
@@ -436,7 +436,7 @@ export default function App() {
           setError(message)
           setMarkResult({
             score: 0,
-            maxMarks: topBand ? 6 : 6,
+            maxMarks: mode === 'essay' ? 6 : 10,
             summary: message,
             ao1: ['We could not confirm subscription access just now. Please refresh status and try again.'],
             ao2: [],
@@ -454,7 +454,7 @@ export default function App() {
         if (mountedRef.current) {
           setMarkResult({
             score: 0,
-            maxMarks: topBand ? 6 : 6,
+            maxMarks: mode === 'essay' ? 6 : 10,
             summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.',
             ao1: ['This workspace is currently configured to require an active subscription before marking.'],
             ao2: [],
