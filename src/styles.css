@@ -315,7 +315,7 @@ textarea { resize: vertical; min-height: 110px; }
   }
 
   .history-item {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 }
 @media (max-width: 420px) {
