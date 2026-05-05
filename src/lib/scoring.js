@@ -40,14 +40,28 @@ export function scoreEssay(answer, topBand, board = 'AQA') {
   const ao3 = []
   let score = 0
 
-  if (length >= 80) {
+  const hasDevelopedLength = length >= 80
+  const hasEvidenceDetail = /\b(example|examples|evidence|quote|quotes|statistic|statistics|fact|facts|terminology|term|terms|detail|specific|specifically|context)\b/i.test(text)
+  const hasReasoning = /\b(because|therefore|this shows|consequently|as a result|proves|suggests)\b/i.test(text)
+  const hasEvaluation = /\b(however|although|overall|on the other hand|ultimately|to a large extent|judgement)\b/i.test(text)
+  const hasStructure = paragraphBreaks >= 2
+  const hasSustainedDevelopment = length > 150
+
+  if (hasDevelopedLength) {
     ao1.push('Clear subject knowledge shown with enough developed detail to reward.')
     score += 1
   } else if (length > 0) {
     ao1.push('Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
   }
 
-  if (/\b(because|therefore|this shows|consequently|as a result|proves|suggests)\b/i.test(text)) {
+  if (hasEvidenceDetail) {
+    ao1.push('You are using specific evidence, examples, or terminology, which strengthens AO1.')
+    score += 1
+  } else {
+    ao1.push('Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
+  }
+
+  if (hasReasoning) {
     ao2.push('You are explaining ideas and linking evidence to your point, which supports AO2.')
     score += 1
   } else {
@@ -59,28 +73,30 @@ export function scoreEssay(answer, topBand, board = 'AQA') {
     ao2.push(boardSpecificFeedback)
   }
 
-  if (/\b(however|although|overall|on the other hand|ultimately|to a large extent|judgement)\b/i.test(text)) {
+  if (hasEvaluation) {
     ao3.push('There is some evaluation or judgement, which helps the top bands.')
     score += 1
   } else {
     ao3.push('Add a clear judgement or comparison to reach stronger AO3 levels.')
   }
 
-  if (paragraphBreaks >= 2) {
+  if (hasStructure) {
     ao3.push('Good paragraph structure identified.')
+    score += 1
   } else {
     ao3.push('Consider using paragraph breaks to improve the structure of your essay.')
   }
 
-  if (topBand) {
-    if (length > 150) {
-      score += 1
+  if (hasSustainedDevelopment) {
+    score += 1
+    ao3.push('Sustained development across the response helps to secure the top band.')
+    if (topBand) {
       ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
       ao2.push('Top Band mode: use linked chains of reasoning and compare alternatives instead of listing points.')
       ao3.push('Top Band mode: refine paragraph sequencing, counterargument, and conclusion flow to maximise impact.')
-    } else {
-      ao3.push('Top Band feedback unlocks best when the essay is more fully developed (over 150 words). Add more detail and evaluation to push into the top band.')
     }
+  } else if (topBand) {
+    ao3.push('Top Band feedback unlocks best when the essay is more fully developed (over 150 words). Add more detail and evaluation to push into the top band.')
   }
 
   return {
@@ -90,7 +106,7 @@ export function scoreEssay(answer, topBand, board = 'AQA') {
     ao2,
     ao3,
     summary: topBand
-      ? length > 150
+      ? hasSustainedDevelopment
         ? 'Grade 9 / Top Band focus: make every paragraph precise, conceptual, and evaluative.'
         : 'Top Band mode is on, but this response needs more development (over 150 words) before full top-band feedback applies.'
       : 'Focus on specific knowledge, explanation, and a clear conclusion.',
@@ -117,42 +133,76 @@ export function scoreMathsScience(answer, topBand, board = 'AQA') {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
   const methodMarks = []
   const addMethodMark = (message) => {
-    if (!methodMarks.includes(message)) {
+    if (message && !methodMarks.includes(message)) {
       methodMarks.push(message)
     }
   }
-  const marks = new Set()
+
+  let score = 0
   const hasMathSignals =
     /\d/.test(text) ||
     /[+\-*/=×÷^√→]/.test(text) ||
     /\b(substitut(e|ion)|calculate|solve|working(?:\s+out)?|show(?:\s+your\s+work|(?:\s+working)?)?|step(?:s)?|equation|formula)\b/i.test(text)
   const hasVisibleCalculation = /[+\-*/=×÷^√→]/.test(text)
+  const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula)\b|→|=>/i.test(text)
+  const hasUnits = /\b(cm|mm|kg|g|mol|dm\^?3|°c)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)
+  const hasConclusion = /\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)
+  const hasFormulaReference = /\b(formula|equation|substitut(e|ion)|calculation|ratio|proportion|graph|table)\b/i.test(text)
+  const hasConceptualDetail = /\b(force|energy|mass|velocity|acceleration|reaction|atom|cell|graph|ratio|probability|mean|median|area|volume|gradient|current|voltage|resistance|density|wave|frequency|temperature|power|percentage|speed|distance|time)\b/i.test(text)
+  const hasSustainedReasoning = text.length >= 100
 
   if (lines.length >= 2 && hasMathSignals) {
-    marks.add('working')
+    score += 2
     addMethodMark('You show more than one line of working, which is good evidence for method marks.')
   } else if (hasMathSignals) {
+    score += 1
     addMethodMark('Show the steps you used, not just the final answer.')
-    if (hasVisibleCalculation) {
-      marks.add('working')
-      addMethodMark('Your response includes visible calculation symbols, which can count as working if the chain of reasoning is clear.')
-    }
   } else {
     addMethodMark('Use equations, substitutions, or calculation steps to earn method marks.')
   }
 
-  if (/\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?)\b|→|=>/i.test(text)) {
-    marks.add('process')
+  if (hasVisibleCalculation) {
+    score += 1
+    addMethodMark('Your response includes visible calculation symbols, which can help show a working trail.')
+  }
+
+  if (hasProcessLanguage) {
+    score += 2
     addMethodMark('Your response includes process language or a clear calculation trail.')
   } else {
     addMethodMark('Use equations, substitutions, or calculation steps to earn method marks.')
   }
 
-  if (/\b(cm|mm|kg|g|mol|dm\^?3|°c)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)) {
-    marks.add('units')
+  if (hasUnits) {
+    score += 1
     addMethodMark('You have included units or scientific measurement language.')
   } else {
     addMethodMark('Include units where needed and keep the final answer contextualised.')
+  }
+
+  if (hasConclusion) {
+    score += 1
+    addMethodMark('Detected markers for a conclusion or final answer, which is key for top marks.')
+  }
+
+  if (hasFormulaReference) {
+    score += 1
+    addMethodMark('You reference formulas, equations, or a calculation path, which helps show method.')
+  }
+
+  if (hasConceptualDetail) {
+    score += 1
+    addMethodMark('You include topic vocabulary or scientific context, which helps demonstrate understanding.')
+  }
+
+  if (hasSustainedReasoning) {
+    score += 1
+    addMethodMark('Your response is long enough to show a fuller chain of reasoning.')
+    if (topBand) {
+      addMethodMark('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
+    }
+  } else if (topBand) {
+    addMethodMark('Top Band feedback unlocks best when the answer is more fully developed (over 100 words).')
   }
 
   const boardSpecificFeedback = getBoardSpecificFeedback(board, 'maths_science')
@@ -160,21 +210,9 @@ export function scoreMathsScience(answer, topBand, board = 'AQA') {
     addMethodMark(boardSpecificFeedback)
   }
 
-  if (/\b(therefore|because|so|hence|which means|final answer)\b/i.test(text)) {
-    marks.add('conclusion')
-    addMethodMark('Detected markers for a conclusion or final answer, which is key for top marks.')
-  }
-
-  if (topBand && text.length >= 100) {
-    marks.add('topband')
-    addMethodMark('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
-  }
-
-  const score = Math.min(marks.size, 10)
-
   return {
     maxMarks: 10,
-    score,
+    score: Math.min(score, 10),
     ao1: ['Method marks are awarded for the steps, working, and correct structure you show.'],
     ao2: ['Explain each step clearly, especially when moving from formula to substitution to answer.'],
     ao3: ['If this is a science question, include the key scientific idea, correct units, and any required conclusion.'],

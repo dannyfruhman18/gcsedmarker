@@ -71,6 +71,7 @@ export default function App() {
   const uploadRequestIdRef = useRef(0)
   const sessionsRequestIdRef = useRef(0)
   const subscriptionsRequestIdRef = useRef(0)
+  const questionTextVersionRef = useRef(0)
   const mountedRef = useRef(true)
   const requestControllersRef = useRef(new Set())
   const sessionsControllerRef = useRef(null)
@@ -287,6 +288,7 @@ export default function App() {
 
     const uploadRequestId = ++uploadRequestIdRef.current
     const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
+    const questionTextVersionAtStart = questionTextVersionRef.current
 
     if (workerRef.current) {
       try {
@@ -356,8 +358,15 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       if (extracted) {
-        setQuestionText(extracted)
-        setOcrStatus(`Text read from image (${extracted.split(/\s+/).filter(Boolean).length} words).`)
+        const extractedWordCount = extracted.split(/\s+/).filter(Boolean).length
+        if (questionTextVersionRef.current === questionTextVersionAtStart) {
+          setQuestionText(extracted)
+          setOcrStatus(`Text read from image (${extractedWordCount} words).`)
+        } else {
+          setOcrStatus(
+            `OCR complete (${extractedWordCount} words), but your manual question edits were kept.`,
+          )
+        }
       } else {
         setOcrStatus('No clear text found. You can type or paste the question manually.')
       }
@@ -663,6 +672,7 @@ export default function App() {
           <div className={`dropzone ${ocrLoading ? 'loading' : ''}`}>
             <input
               id="upload"
+              className="visually-hidden"
               type="file"
               accept="image/*"
               onChange={(e) => {
@@ -705,7 +715,10 @@ export default function App() {
               Question or prompt
               <textarea
                 value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
+                onChange={(e) => {
+                  questionTextVersionRef.current += 1
+                  setQuestionText(e.target.value)
+                }}
                 placeholder="Paste the question text here."
                 rows={7}
               />
