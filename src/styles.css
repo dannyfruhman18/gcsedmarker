@@ -38,10 +38,18 @@ body {
   margin: 0;
   min-height: 100dvh;
   background: linear-gradient(180deg, var(--color-page-gradient-start) 0%, var(--color-page-gradient-end) 100%);
+  overflow-x: hidden;
 }
 a { color: var(--color-link); text-decoration: none; }
 a:hover { text-decoration: underline; }
-button, select, textarea, input { font: inherit; }
+img, video {
+  display: block;
+  max-width: 100%;
+}
+button, select, textarea, input {
+  font: inherit;
+  min-width: 0;
+}
 button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
@@ -69,6 +77,7 @@ button:disabled:hover {
   border-radius: 20px;
   box-shadow: var(--surface-panel-shadow);
   backdrop-filter: blur(14px);
+  min-width: 0;
 }
 
 .hero {
@@ -81,6 +90,7 @@ button:disabled:hover {
 .hero-card {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .brand-row {
@@ -116,6 +126,8 @@ h1 {
   border: 1px solid var(--surface-chip-border);
   border-radius: 999px;
   background: var(--surface-chip-bg);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .stat-row {
   display: grid;
@@ -126,6 +138,7 @@ h1 {
   padding: 12px 14px;
   border-radius: 14px;
   background: var(--surface-soft);
+  min-width: 0;
 }
 .stat span {
   display: block;
@@ -149,6 +162,7 @@ h1 {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+  min-width: 0;
 }
 .panel h2 {
   margin: 0;
@@ -171,9 +185,11 @@ label {
   gap: 8px;
   color: var(--color-text-soft);
   font-size: 0.94rem;
+  min-width: 0;
 }
 select, textarea, input[type='email'] {
   width: 100%;
+  min-width: 0;
   border-radius: 14px;
   border: 1px solid var(--surface-input-border);
   background: var(--surface-soft);
@@ -191,6 +207,10 @@ select, textarea, input[type='email'] {
   background: var(--surface-soft-subtle);
   text-align: center;
   transition: all 0.2s ease;
+}
+.upload-button strong,
+.upload-button span {
+  display: block;
 }
 .upload-button:hover {
   background: var(--surface-soft-hover);
@@ -312,8 +332,8 @@ textarea { resize: vertical; min-height: 110px; }
   grid-template-columns: 1fr 0.9fr;
   gap: 14px;
 }
-.subscription-form { display: grid; gap: 12px; }
-.subscription-cards { display: grid; gap: 12px; }
+.subscription-form { display: grid; gap: 12px; min-width: 0; }
+.subscription-cards { display: grid; gap: 12px; min-width: 0; }
 .tier-card {
   padding: 16px;
   display: grid;
@@ -321,7 +341,15 @@ textarea { resize: vertical; min-height: 110px; }
 }
 .tier-card span { color: var(--color-brand); }
 .result-note { color: var(--color-text-soft); margin: 0; }
-.board-links { text-align: right; }
+.board-links {
+  text-align: right;
+  min-width: 0;
+}
+.board-links a {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 @media (max-width: 1100px) and (min-width: 781px) {
   .stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
