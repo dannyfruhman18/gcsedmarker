@@ -17,6 +17,8 @@ if (SUPABASE_CONFIG_ERROR) {
   )
 }
 
+console.log('GCSEmarker Supabase URL:', SUPABASE_URL)
+
 const BOARD_LINKS = {
   AQA: {
     label: 'AQA past papers and mark schemes',
@@ -265,6 +267,7 @@ function App() {
   const [recentSessions, setRecentSessions] = useState([])
   const [recentSubscriptions, setRecentSubscriptions] = useState([])
   const [loadingSessions, setLoadingSessions] = useState(false)
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false)
   const [saving, setSaving] = useState(false)
   const [subscriptionEmail, setSubscriptionEmail] = useState('')
   const [subscriptionPlan, setSubscriptionPlan] = useState('top-band')
@@ -299,6 +302,7 @@ function App() {
   async function loadSessions() {
     setSessionsError(null)
     try {
+      setLoadingSessions(true)
       const rows = await supabaseRequest('/rest/v1/marking_sessions?select=*&order=created_at.desc&limit=5', {
         method: 'GET',
         headers: { Accept: 'application/json' },
@@ -319,6 +323,7 @@ function App() {
   async function loadSubscriptions(email = '') {
     setSubscriptionsError(null)
     try {
+      setLoadingSubscriptions(true)
       const normalizedEmail = normalizeEmail(email)
       const emailFilter = normalizedEmail ? `&email=ilike.${encodeURIComponent(normalizedEmail)}` : ''
       // TODO: Query subscriptions by email/status on the server instead of loading a broad recent history for better scale.
@@ -337,6 +342,8 @@ function App() {
       console.error(err)
       setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
       return null
+    } finally {
+      setLoadingSubscriptions(false)
     }
   }
 
@@ -710,7 +717,9 @@ function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent subscriptions</h2>
-          <button className="secondary" onClick={() => void loadSubscriptions(normalizedSubscriptionEmail)}>Refresh</button>
+          <button className="secondary" onClick={() => void loadSubscriptions(normalizedSubscriptionEmail)} disabled={loadingSubscriptions}>
+            {loadingSubscriptions ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
         <div className="history-list">
           {recentSubscriptions.length ? (
