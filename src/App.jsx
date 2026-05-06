@@ -467,15 +467,11 @@ export default function App() {
       console.error('OCR failed while reading uploaded question:', err)
       const errorMessage = err?.message || String(err)
       const sanitizedErrorMessage = errorMessage.endsWith('.') ? errorMessage.slice(0, -1) : errorMessage
-      if (workerRef.current) {
-        setOcrStatus(
-          `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under 5MB.`,
-        )
-      } else {
-        setOcrStatus(
-          `OCR could not start: ${sanitizedErrorMessage}. Please try again or reload the page.`,
-        )
-      }
+      const ocrErrorMessage = workerRef.current
+        ? `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under 5MB.`
+        : `OCR could not start: ${sanitizedErrorMessage}. Please try again or reload the page.`
+      setError(ocrErrorMessage)
+      setOcrStatus(ocrErrorMessage)
     } finally {
       if (isLatestUpload() && mountedRef.current) {
         setOcrLoading(false)
