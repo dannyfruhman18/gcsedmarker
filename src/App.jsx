@@ -828,6 +828,7 @@ export default function App() {
             <label
               htmlFor="upload"
               className="upload-button"
+              role="button"
               tabIndex={ocrLoading ? -1 : 0}
               aria-disabled={ocrLoading}
               onKeyDown={(e) => {
