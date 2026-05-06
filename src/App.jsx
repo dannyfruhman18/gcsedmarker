@@ -967,7 +967,7 @@ export default function App() {
               <article key={session?.id ?? `session-${index}`} className="history-item">
                 <div>
                   <strong>{session?.exam_board ?? 'Unknown board'}</strong>
-                  <span>{modeOptions.find((m) => m.id === session.mode)?.label ?? session.mode}</span>
+                  <span>{modeOptions.find((m) => m.id === session?.mode)?.label ?? session?.mode}</span>
                 </div>
                 <div>
                   <strong>{session?.score ?? 0}</strong>
@@ -994,7 +994,7 @@ export default function App() {
               <article key={subscription?.id ?? `subscription-${index}`} className="history-item">
                 <div>
                   <strong>{maskEmail(subscription?.email)}</strong>
-                  <span>{subscriptionPlans.find((p) => p.id === subscription.plan)?.label ?? subscription.plan}</span>
+                  <span>{subscriptionPlans.find((p) => p.id === subscription?.plan)?.label ?? subscription?.plan}</span>
                 </div>
                 <div>
                   <strong>{subscription?.status ?? 'Unknown status'}</strong>

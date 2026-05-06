@@ -5,7 +5,7 @@
   "description": "GCSEmarker app for exam-board-aware marking, Top Band feedback, and subscription access.",
   "type": "module",
   "engines": {
-    "node": "^24"
+    "node": "^22"
   },
   "scripts": {
     "dev": "vite",
