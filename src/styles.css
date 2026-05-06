@@ -414,7 +414,7 @@ textarea { resize: vertical; min-height: 110px; }
   max-width: 100%;
   overflow-wrap: anywhere;
 }
-@media (max-width: 1100px) and (min-width: 781px) {
+@media (max-width: 1100px) and (min-width: 641px) {
   .stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -433,7 +433,6 @@ textarea { resize: vertical; min-height: 110px; }
     padding: 12px 10px 36px;
   }
 
-  .stat-row,
   .control-row,
   .subscription-grid {
     grid-template-columns: 1fr;
@@ -461,6 +460,11 @@ textarea { resize: vertical; min-height: 110px; }
 
   .history-item {
     flex-direction: column;
+  }
+}
+@media (max-width: 640px) {
+  .stat-row {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 420px) {

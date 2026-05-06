@@ -395,8 +395,6 @@ export default function App() {
       }
       setUploadName('')
       setUploadPreview('')
-      setQuestionText('')
-      setMarkResult(null)
       setOcrLoading(false)
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
@@ -410,8 +408,6 @@ export default function App() {
       }
       setUploadName('')
       setUploadPreview('')
-      setQuestionText('')
-      setMarkResult(null)
       setOcrLoading(false)
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
@@ -469,7 +465,7 @@ export default function App() {
           setOcrStatus(`Text read from image (${extractedWordCount} words).`)
         } else {
           setOcrStatus(
-            `OCR complete (${extractedWordCount} words), but your manual question edits were kept.`,
+            `OCR complete (${extractedWordCount} words). We kept your manual question edits so you can keep refining the prompt below.`,
           )
         }
       } else if (questionTextVersionRef.current === questionTextVersionAtStart) {
@@ -680,6 +676,7 @@ export default function App() {
           stripeWindowClosed: stripeWindow ? stripeWindow.closed : null,
           stripePaymentLinkConfigured: Boolean(STRIPE_PAYMENT_LINK),
         })
+        setSubscriptionResult('Stripe checkout popup was blocked. Use the fallback checkout link below to complete payment.')
       } else {
         try {
           stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
@@ -722,7 +719,7 @@ export default function App() {
       setSubscriptionResult(
         STRIPE_PAYMENT_LINK
           ? stripePopupBlocked
-            ? 'Subscription record saved in Supabase, but the Stripe popup was blocked. Please allow popups or open the payment link manually.'
+            ? 'Stripe checkout popup was blocked. Subscription record saved in Supabase. Use the fallback checkout link below to complete payment.'
             : 'Subscription record saved in Supabase and Stripe checkout opened.'
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.',
       )
@@ -743,7 +740,11 @@ export default function App() {
       const configErrorMessage = getSupabaseConfigErrorMessage(err)
       const message = configErrorMessage ?? `Subscription save failed: ${err?.message || String(err)}`
       setError(message)
-      setSubscriptionResult(message)
+      setSubscriptionResult(
+        stripePopupBlocked
+          ? `${message} The Stripe popup was blocked, so use the fallback checkout link below to continue payment.`
+          : message,
+      )
     } finally {
       if (mountedRef.current) {
         setSubmittingSubscription(false)
@@ -874,6 +875,7 @@ export default function App() {
                 <button
                   type="button"
                   className="clear-button"
+                  disabled={ocrLoading}
                   onClick={clearUpload}
                 >
                   Clear
@@ -992,6 +994,11 @@ export default function App() {
               Refresh Status
             </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
+            {subscriptionResult.toLowerCase().includes('popup was blocked') && STRIPE_PAYMENT_LINK ? (
+              <a className="chip-link" href={STRIPE_PAYMENT_LINK} target="_blank" rel="noreferrer">
+                Open Stripe checkout in a new tab
+              </a>
+            ) : null}
           </div>
           <div className="subscription-cards">
             {subscriptionPlans.map((plan) => (
