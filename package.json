@@ -5,7 +5,7 @@
   "description": "GCSEmarker app for exam-board-aware marking, Top Band feedback, and subscription access.",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "^24"
   },
   "scripts": {
     "dev": "vite",
@@ -15,14 +15,14 @@
     "cap:sync": "node scripts/capacitor-sync.mjs"
   },
   "dependencies": {
-    "@capacitor/cli": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tesseract.js": "^5.1.1"
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.10"
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.0"
   }
 }
