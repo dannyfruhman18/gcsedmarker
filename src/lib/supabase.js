@@ -95,6 +95,7 @@ export async function supabaseRequest(path, options = {}, signal) {
   }
 
   const requestPath = normaliseRequestPath(path)
+  console.log(`Supabase request: ${requestPath}`)
   const requestUrl = `${SUPABASE_BASE_URL.replace(/\/+$/, '')}${requestPath}`
   const hasBody = options.body !== undefined && options.body !== null
   const headers = {
