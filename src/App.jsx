@@ -53,6 +53,23 @@ function getSupabaseConfigErrorMessage(error) {
   return message === SUPABASE_CONFIG_ERROR ? SUPABASE_CONFIG_ERROR : null
 }
 
+function getValidStripePaymentLink(link) {
+  const value = String(link ?? '').trim()
+  if (!value) {
+    return null
+  }
+
+  try {
+    const url = new URL(value)
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return null
+    }
+    return url
+  } catch {
+    return null
+  }
+}
+
 export default function App() {
   const [board, setBoard] = useState('AQA')
   const [mode, setMode] = useState('essay')
@@ -633,10 +650,20 @@ export default function App() {
       return
     }
 
+    const stripePaymentLinkUrl = getValidStripePaymentLink(STRIPE_PAYMENT_LINK)
     let stripeWindow = null
     let stripePopupBlocked = false
 
     if (STRIPE_PAYMENT_LINK) {
+      if (!stripePaymentLinkUrl) {
+        const message =
+          'Stripe payment link is invalid. Set VITE_STRIPE_PAYMENT_LINK to a valid http(s) URL before opening checkout.'
+        console.error(message, { stripePaymentLink: STRIPE_PAYMENT_LINK })
+        setError(message)
+        setSubscriptionResult(message)
+        return
+      }
+
       try {
         stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
       } catch (popupOpenErr) {
@@ -678,9 +705,9 @@ export default function App() {
 
       if (!mountedRef.current) return
 
-      if (STRIPE_PAYMENT_LINK && stripeWindow && !stripeWindow.closed) {
+      if (stripePaymentLinkUrl && stripeWindow && !stripeWindow.closed) {
         try {
-          stripeWindow.location.href = STRIPE_PAYMENT_LINK
+          stripeWindow.location.href = stripePaymentLinkUrl.href
         } catch (popupRedirectErr) {
           console.error('Stripe checkout popup opened, but redirecting to the payment link failed.', popupRedirectErr)
         }
