@@ -48,6 +48,11 @@ const OCR_WORKER_INIT_TIMEOUT_MS = 30_000
 const OCR_WORKER_INIT_TIMEOUT_ERROR =
   'OCR worker initialization timed out after 30 seconds. Please try again or reload the page.'
 
+function getSupabaseConfigErrorMessage(error) {
+  const message = error?.message || String(error)
+  return message === SUPABASE_CONFIG_ERROR ? SUPABASE_CONFIG_ERROR : null
+}
+
 export default function App() {
   const [board, setBoard] = useState('AQA')
   const [mode, setMode] = useState('essay')
@@ -68,7 +73,7 @@ export default function App() {
   const [subscriptionPlan, setSubscriptionPlan] = useState('top-band')
   const [subscriptionResult, setSubscriptionResult] = useState('')
   const [submittingSubscription, setSubmittingSubscription] = useState(false)
-  const [error, setError] = useState(SUPABASE_CONFIG_ERROR)
+  const [error, setError] = useState(null)
   const [sessionsError, setSessionsError] = useState(null)
   const [subscriptionsError, setSubscriptionsError] = useState(null)
 
@@ -194,7 +199,10 @@ export default function App() {
 
       console.error('Could not load recent marking sessions:', err)
       if (mountedRef.current) {
-        setSessionsError(`Could not load recent marking sessions: ${err?.message || String(err)}`)
+        const configErrorMessage = getSupabaseConfigErrorMessage(err)
+        setSessionsError(
+          configErrorMessage ?? `Could not load recent marking sessions: ${err?.message || String(err)}`,
+        )
       }
       return []
     } finally {
@@ -260,7 +268,10 @@ export default function App() {
 
       console.error('Could not load recent subscriptions:', err)
       if (mountedRef.current) {
-        setSubscriptionsError(`Could not load recent subscriptions: ${err?.message || String(err)}`)
+        const configErrorMessage = getSupabaseConfigErrorMessage(err)
+        setSubscriptionsError(
+          configErrorMessage ?? `Could not load recent subscriptions: ${err?.message || String(err)}`,
+        )
       }
       return null
     } finally {
@@ -567,8 +578,8 @@ export default function App() {
           {
             exam_board: board,
             mode,
-            question_text: questionText,
-            answer_text: answerText,
+            question_text: trimmedQuestion,
+            answer_text: trimmedAnswer,
             upload_name: uploadName,
             score: result.score,
             feedback: result,
@@ -584,7 +595,10 @@ export default function App() {
       if (!mountedRef.current) return
 
       window.scrollTo(0, 0)
-      const message = `Supabase save failed. Check VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, network connectivity, and Supabase RLS or table permissions for marking_sessions/subscriptions. Original error: ${err?.message || String(err)}`
+      const configErrorMessage = getSupabaseConfigErrorMessage(err)
+      const message =
+        configErrorMessage ??
+        `Supabase save failed. Check VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, network connectivity, and Supabase RLS or table permissions for marking_sessions/subscriptions. Original error: ${err?.message || String(err)}`
       setError(message)
       setMarkResult((current) => ({
         ...(current || {}),
@@ -688,7 +702,8 @@ export default function App() {
 
       if (!mountedRef.current) return
 
-      const message = `Subscription save failed: ${err?.message || String(err)}`
+      const configErrorMessage = getSupabaseConfigErrorMessage(err)
+      const message = configErrorMessage ?? `Subscription save failed: ${err?.message || String(err)}`
       setError(message)
       setSubscriptionResult(message)
     } finally {
