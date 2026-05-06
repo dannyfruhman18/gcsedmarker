@@ -790,7 +790,7 @@ export default function App() {
             <label
               htmlFor="upload"
               className="upload-button"
-              tabIndex="0"
+              tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
