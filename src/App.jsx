@@ -819,6 +819,7 @@ export default function App() {
               className="visually-hidden"
               type="file"
               accept="image/*"
+              disabled={ocrLoading}
               onChange={(e) => {
                 void handleFileChange(e.target.files?.[0])
                 e.target.value = ''
@@ -827,8 +828,12 @@ export default function App() {
             <label
               htmlFor="upload"
               className="upload-button"
-              tabIndex={0}
+              tabIndex={ocrLoading ? -1 : 0}
+              aria-disabled={ocrLoading}
               onKeyDown={(e) => {
+                if (ocrLoading) {
+                  return
+                }
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
                   document.getElementById('upload')?.click()
