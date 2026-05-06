@@ -339,8 +339,11 @@ export default function App() {
       ocrProgressHandlerRef.current = null
       workerInitPromiseRef.current = null
       if (workerRef.current) {
-        void workerRef.current.terminate().catch(() => {})
+        const worker = workerRef.current
         workerRef.current = null
+        void (async () => {
+          await worker.terminate().catch(() => {})
+        })()
       }
     }
   }, [])

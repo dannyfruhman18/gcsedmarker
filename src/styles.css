@@ -305,6 +305,10 @@ textarea { resize: vertical; min-height: 110px; }
   color: var(--color-text);
   border-color: var(--surface-input-border-strong);
 }
+.clear-button:active {
+  transform: translateY(1px);
+  filter: brightness(0.9);
+}
 
 .result-card {
   padding: 16px;
@@ -418,6 +422,8 @@ textarea { resize: vertical; min-height: 110px; }
   .control-row,
   .subscription-grid {
     grid-template-columns: 1fr;
+    overflow: hidden;
+    min-width: 0;
   }
 
   .history-panel .history-list {
