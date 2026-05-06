@@ -95,6 +95,7 @@ export default function App() {
     () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
   )
+  const supabaseConfigMessage = SUPABASE_CONFIG_ERROR || ''
 
   const ensureOcrWorker = useCallback(async () => {
     if (workerRef.current) {
@@ -479,6 +480,7 @@ export default function App() {
 
   async function handleMark() {
     setError(null)
+    setSessionsError(null)
     setSubscriptionsError(null)
 
     const trimmedQuestion = questionText.trim()
@@ -616,6 +618,7 @@ export default function App() {
 
   async function handleSubscription() {
     setError(null)
+    setSessionsError(null)
     setSubscriptionResult('')
     setSubscriptionsError(null)
 
@@ -750,6 +753,13 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {supabaseConfigMessage ? (
+        <section className="panel" role="alert" aria-live="assertive">
+          <h2>Supabase not configured</h2>
+          <p className="error">{supabaseConfigMessage}</p>
+        </section>
+      ) : null}
 
       {error || sessionsError || subscriptionsError ? (
         <section className="panel" role="alert" aria-live="assertive">
