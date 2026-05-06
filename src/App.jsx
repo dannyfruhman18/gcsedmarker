@@ -618,12 +618,9 @@ export default function App() {
         console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
       }
 
-      if (!stripeWindow) {
-        alert('Your browser blocked the Stripe checkout popup. Please allow popups and try again.')
-      }
-
       stripePopupBlocked = !stripeWindow
       if (stripePopupBlocked) {
+        alert('Your browser blocked the Stripe checkout popup. Please allow popups and try again.')
         console.error('Stripe checkout popup was blocked or failed to open.', {
           email,
           plan: subscriptionPlan,
