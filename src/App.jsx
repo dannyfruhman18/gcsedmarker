@@ -286,7 +286,7 @@ export default function App() {
       return
     }
 
-    const rows = await loadSubscriptions(email, { updateRecentSubscriptions: false })
+    const rows = await loadSubscriptions(email, { updateRecentSubscriptions: true })
     if (rows === null) {
       setSubscriptionResult('Failed to refresh status.')
     } else {
@@ -360,13 +360,21 @@ export default function App() {
     )
 
     if (!isImageType) {
-      clearUpload()
+      if (uploadPreview) {
+        URL.revokeObjectURL(uploadPreview)
+      }
+      setUploadName('')
+      setUploadPreview('')
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
     }
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      clearUpload()
+      if (uploadPreview) {
+        URL.revokeObjectURL(uploadPreview)
+      }
+      setUploadName('')
+      setUploadPreview('')
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
     }
@@ -610,6 +618,10 @@ export default function App() {
         console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
       }
 
+      if (!stripeWindow) {
+        alert('Your browser blocked the Stripe checkout popup. Please allow popups and try again.')
+      }
+
       stripePopupBlocked = !stripeWindow
       if (stripePopupBlocked) {
         console.error('Stripe checkout popup was blocked or failed to open.', {
@@ -849,25 +861,25 @@ export default function App() {
               {markResult.ao1?.length ? (
                 <div>
                   <h3>AO1</h3>
-                  <ul>{markResult.ao1.map((item, index) => <li key={`${index}-${item.slice(0, 30)}`}>{item}</li>)}</ul>
+                  <ul>{markResult.ao1.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.ao2?.length ? (
                 <div>
                   <h3>AO2</h3>
-                  <ul>{markResult.ao2.map((item, index) => <li key={`${index}-${item.slice(0, 30)}`}>{item}</li>)}</ul>
+                  <ul>{markResult.ao2.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.ao3?.length ? (
                 <div>
                   <h3>AO3</h3>
-                  <ul>{markResult.ao3.map((item, index) => <li key={`${index}-${item.slice(0, 30)}`}>{item}</li>)}</ul>
+                  <ul>{markResult.ao3.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.extra?.length ? (
                 <div>
                   <h3>Method marks</h3>
-                  <ul>{markResult.extra.map((item, index) => <li key={`${index}-${item.slice(0, 30)}`}>{item}</li>)}</ul>
+                  <ul>{markResult.extra.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                 </div>
               ) : null}
               {markResult.storageError ? <p className="error">{markResult.storageError}</p> : null}
