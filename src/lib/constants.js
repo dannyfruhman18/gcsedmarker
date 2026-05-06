@@ -15,6 +15,7 @@ export const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 export const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
   'active',
   'trialing',
+  'pending_payment',
 ])
 export const MAX_VISIBLE_HISTORY_ROWS = 5
 
