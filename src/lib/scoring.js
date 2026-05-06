@@ -377,13 +377,13 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   }
 
   let score = 0
-  const hasVisibleCalculation = /[+\-*/×÷^√→]/.test(text) || /=>/.test(text)
-  const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show(?:\s+your\s+work|(?:\s+working)?)?|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate)\b|→|=>/i.test(text)
+  const hasVisibleCalculation = /(?:\d+(?:\.\d+)?\s*[+\-×÷^]\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*=\s*\d+(?:\.\d+)?|=>|→)/.test(text)
+  const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show\s+(?:your\s+work|the\s+working|working(?:\s+out)?)|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate)\b|→|=>/i.test(text)
   const hasWorkingTrail = lines.length >= 2 && (hasVisibleCalculation || hasProcessLanguage)
   const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage
   const hasFormulaReference = /\b(formula|equation|substitut(e|ion)|calculation|ratio|proportion|graph|table|method)\b/i.test(text)
   const hasUnits = /\b(cm|mm|kg|g|mol|dm\^?3|°c)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)
-  const hasConclusion = /\b(therefore|because|so|hence|which means|final answer|in conclusion)\b/i.test(text)
+  const hasConclusion = /\b(therefore|consequently|ultimately|hence|which means|final answer|in conclusion)\b/i.test(text)
   const hasConceptualDetail = /\b(force|energy|mass|velocity|acceleration|reaction|atom|cell|graph|ratio|probability|mean|median|area|volume|gradient|current|voltage|resistance|density|wave|frequency|temperature|power|percentage|speed|distance|time|fraction|equation|function)\b/i.test(text)
   const hasVerification = /\b(check|checked|verify|verified|recheck|sensible|reasonable|plausible|substitut(e|ion)\s+back|back-substitute|sanity check)\b/i.test(text)
   const hasPromptFocus = questionAnalysis.questionKeywords.length

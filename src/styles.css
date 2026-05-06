@@ -334,6 +334,9 @@ textarea { resize: vertical; min-height: 110px; }
 .tier-card p {
   overflow-wrap: anywhere;
 }
+.result-card li {
+  overflow-wrap: anywhere;
+}
 .result-card h3 {
   margin: 0 0 6px;
   font-size: 1rem;

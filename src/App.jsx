@@ -329,16 +329,12 @@ export default function App() {
   }, [loadSubscriptions, normalizedSubscriptionEmail])
 
   const clearUpload = useCallback(() => {
-    if (uploadPreview) {
-      URL.revokeObjectURL(uploadPreview)
-    }
-
     uploadRequestIdRef.current += 1
     setUploadName('')
     setUploadPreview('')
     setOcrStatus('Upload an image and OCR will fill the question box.')
     setOcrLoading(false)
-  }, [uploadPreview])
+  }, [])
 
   useEffect(() => {
     if (SUPABASE_CONFIG_ERROR && !configErrorLoggedRef.current) {
@@ -399,6 +395,8 @@ export default function App() {
       }
       setUploadName('')
       setUploadPreview('')
+      setQuestionText('')
+      setMarkResult(null)
       setOcrLoading(false)
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
@@ -412,6 +410,8 @@ export default function App() {
       }
       setUploadName('')
       setUploadPreview('')
+      setQuestionText('')
+      setMarkResult(null)
       setOcrLoading(false)
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
@@ -501,6 +501,7 @@ export default function App() {
     setError(null)
     setSessionsError(null)
     setSubscriptionsError(null)
+    setMarkResult(null)
 
     const trimmedQuestion = questionText.trim()
     const trimmedAnswer = answerText.trim()
@@ -674,9 +675,10 @@ export default function App() {
       if (stripePopupBlocked) {
         alert('Your browser blocked the Stripe checkout popup. Please allow popups and try again.')
         console.error('Stripe checkout popup was blocked or failed to open.', {
-          email,
-          plan: subscriptionPlan,
-          hasStripePaymentLink: Boolean(STRIPE_PAYMENT_LINK),
+          stripePopupBlocked,
+          stripeWindowOpen: Boolean(stripeWindow),
+          stripeWindowClosed: stripeWindow ? stripeWindow.closed : null,
+          stripePaymentLinkConfigured: Boolean(STRIPE_PAYMENT_LINK),
         })
       } else {
         try {
@@ -727,8 +729,6 @@ export default function App() {
     } catch (err) {
       console.error('Subscription save failed:', err)
       console.error('Subscription popup state at failure:', {
-        email,
-        plan: subscriptionPlan,
         stripePopupBlocked,
         stripeWindowOpen: Boolean(stripeWindow),
         stripeWindowClosed: stripeWindow ? stripeWindow.closed : null,
