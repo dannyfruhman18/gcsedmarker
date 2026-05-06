@@ -375,21 +375,27 @@ export default function App() {
     )
 
     if (!isImageType) {
+      uploadRequestIdRef.current += 1
+      ocrProgressHandlerRef.current = null
       if (uploadPreview) {
         URL.revokeObjectURL(uploadPreview)
       }
       setUploadName('')
       setUploadPreview('')
+      setOcrLoading(false)
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
     }
 
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      uploadRequestIdRef.current += 1
+      ocrProgressHandlerRef.current = null
       if (uploadPreview) {
         URL.revokeObjectURL(uploadPreview)
       }
       setUploadName('')
       setUploadPreview('')
+      setOcrLoading(false)
       setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
       return
     }
@@ -554,10 +560,13 @@ export default function App() {
 
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !hasActiveSubscription) {
         if (mountedRef.current) {
+          const subscriptionRequiredMessage = 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.'
+          window.scrollTo(0, 0)
+          setError(subscriptionRequiredMessage)
           setMarkResult({
             score: 0,
             maxMarks: mode === 'essay' ? 6 : 10,
-            summary: 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.',
+            summary: subscriptionRequiredMessage,
             ao1: ['This workspace is currently configured to require an active subscription before marking.'],
             ao2: [],
             ao3: [],

@@ -422,7 +422,6 @@ textarea { resize: vertical; min-height: 110px; }
   .control-row,
   .subscription-grid {
     grid-template-columns: 1fr;
-    overflow: hidden;
     min-width: 0;
   }
 
