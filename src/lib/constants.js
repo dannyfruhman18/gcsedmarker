@@ -35,9 +35,13 @@ export const BOARD_LINKS = {
     label: 'WJEC past papers and mark schemes',
     href: 'https://www.wjec.co.uk/home/past-papers/',
   },
+  CCEA: {
+    label: 'CCEA past papers and mark schemes',
+    href: 'https://ccea.org.uk/learning-resources/exams-assessments/past-papers-and-mark-schemes',
+  },
 }
 
-export const boardOptions = ['AQA', 'Edexcel', 'OCR', 'WJEC']
+export const boardOptions = ['AQA', 'Edexcel', 'OCR', 'WJEC', 'CCEA']
 
 export const modeOptions = [
   { id: 'essay', label: 'Essay marking' },

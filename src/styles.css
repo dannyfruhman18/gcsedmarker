@@ -138,6 +138,9 @@ h1 {
   align-items: flex-start;
 }
 .chip-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px 14px;
   border: 1px solid var(--surface-chip-border);
   border-radius: 999px;
@@ -145,6 +148,14 @@ h1 {
   max-width: 100%;
   overflow-wrap: anywhere;
   line-height: 1.35;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transform-origin: center;
+}
+.chip-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--surface-input-border-strong);
+  transform: translateY(-1px) scale(1.015);
+  text-decoration: none;
 }
 .stat-row {
   display: grid;
@@ -294,6 +305,25 @@ textarea { resize: vertical; min-height: 110px; }
   background: var(--surface-soft);
   color: var(--color-text);
 }
+.copy-button {
+  align-self: start;
+  margin-top: 0;
+  border: 1px solid var(--surface-input-border);
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: var(--surface-soft-subtle);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.copy-button:hover {
+  background: var(--surface-soft-hover);
+  border-color: var(--surface-input-border-strong);
+  transform: translateY(-1px);
+}
+.copy-button:active {
+  transform: translateY(1px);
+}
 .clear-button {
   background: var(--surface-soft-subtle);
   color: var(--color-text-muted);
@@ -368,6 +398,7 @@ textarea { resize: vertical; min-height: 110px; }
 }
 .history-item {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 14px;

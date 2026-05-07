@@ -81,6 +81,7 @@ export default function App() {
   const [ocrStatus, setOcrStatus] = useState('Upload an image and OCR will fill the question box.')
   const [ocrLoading, setOcrLoading] = useState(false)
   const [markResult, setMarkResult] = useState(null)
+  const [copyFeedbackStatus, setCopyFeedbackStatus] = useState('')
   const [recentSessions, setRecentSessions] = useState([])
   const [recentSubscriptions, setRecentSubscriptions] = useState([])
   const [loadingSessions, setLoadingSessions] = useState(false)
@@ -93,6 +94,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [sessionsError, setSessionsError] = useState(null)
   const [subscriptionsError, setSubscriptionsError] = useState(null)
+  const [ocrRetryAvailable, setOcrRetryAvailable] = useState(false)
 
   const uploadRequestIdRef = useRef(0)
   const sessionsRequestIdRef = useRef(0)
@@ -106,6 +108,7 @@ export default function App() {
   const workerRef = useRef(null)
   const workerInitPromiseRef = useRef(null)
   const ocrProgressHandlerRef = useRef(null)
+  const pendingOcrFileRef = useRef(null)
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -330,6 +333,8 @@ export default function App() {
 
   const clearUpload = useCallback(() => {
     uploadRequestIdRef.current += 1
+    pendingOcrFileRef.current = null
+    setOcrRetryAvailable(false)
     setUploadName('')
     setUploadPreview('')
     setOcrStatus('Upload an image and OCR will fill the question box.')
@@ -352,6 +357,7 @@ export default function App() {
       requestControllersRef.current.clear()
       ocrProgressHandlerRef.current = null
       workerInitPromiseRef.current = null
+      pendingOcrFileRef.current = null
       if (workerRef.current) {
         const worker = workerRef.current
         workerRef.current = null
@@ -390,6 +396,8 @@ export default function App() {
     if (!isImageType) {
       uploadRequestIdRef.current += 1
       ocrProgressHandlerRef.current = null
+      pendingOcrFileRef.current = null
+      setOcrRetryAvailable(false)
       if (uploadPreview) {
         URL.revokeObjectURL(uploadPreview)
       }
@@ -403,6 +411,8 @@ export default function App() {
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
       uploadRequestIdRef.current += 1
       ocrProgressHandlerRef.current = null
+      pendingOcrFileRef.current = null
+      setOcrRetryAvailable(false)
       if (uploadPreview) {
         URL.revokeObjectURL(uploadPreview)
       }
@@ -416,6 +426,9 @@ export default function App() {
     const uploadRequestId = ++uploadRequestIdRef.current
     const isLatestUpload = () => uploadRequestIdRef.current === uploadRequestId
     const questionTextVersionAtStart = questionTextVersionRef.current
+
+    pendingOcrFileRef.current = file
+    setOcrRetryAvailable(false)
 
     if (uploadPreview) {
       URL.revokeObjectURL(uploadPreview)
@@ -474,15 +487,19 @@ export default function App() {
       } else {
         setOcrStatus('No clear text found. Your manual question edits were kept.')
       }
+
+      setOcrRetryAvailable(false)
     } catch (err) {
       if (!mountedRef.current || !isLatestUpload()) return
 
       console.error('OCR failed while reading uploaded question:', err)
       const errorMessage = err?.message || String(err)
       const sanitizedErrorMessage = errorMessage.endsWith('.') ? errorMessage.slice(0, -1) : errorMessage
-      const ocrErrorMessage = workerRef.current
-        ? `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under 5MB.`
-        : `OCR could not start: ${sanitizedErrorMessage}. Please try again or reload the page.`
+      const initFailure = !workerRef.current
+      const ocrErrorMessage = initFailure
+        ? `OCR could not start: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
+        : `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under 5MB.`
+      setOcrRetryAvailable(initFailure)
       setError(ocrErrorMessage)
       setOcrStatus(ocrErrorMessage)
     } finally {
@@ -493,11 +510,26 @@ export default function App() {
     }
   }
 
+  async function handleOcrRetry() {
+    const file = pendingOcrFileRef.current
+    if (!file) {
+      setOcrRetryAvailable(false)
+      setOcrStatus('There is no uploaded image to retry. Please upload the question image again.')
+      return
+    }
+
+    setError(null)
+    setOcrRetryAvailable(false)
+    setOcrStatus('Retrying OCR...')
+    await handleFileChange(file)
+  }
+
   async function handleMark() {
+    setMarkResult(null)
     setError(null)
     setSessionsError(null)
     setSubscriptionsError(null)
-    setMarkResult(null)
+    setCopyFeedbackStatus('')
 
     const trimmedQuestion = questionText.trim()
     const trimmedAnswer = answerText.trim()
@@ -648,10 +680,13 @@ export default function App() {
     }
 
     const stripePaymentLinkUrl = getValidStripePaymentLink(STRIPE_PAYMENT_LINK)
+    const hasStripePaymentLink = Boolean(STRIPE_PAYMENT_LINK)
     let stripeWindow = null
     let stripePopupBlocked = false
+    const popupBlockedMessage =
+      'Stripe checkout popup was blocked by your browser. The subscription was saved in Supabase, and you can use the fallback link below to complete payment.'
 
-    if (STRIPE_PAYMENT_LINK) {
+    if (hasStripePaymentLink) {
       if (!stripePaymentLinkUrl) {
         const message =
           'Stripe payment link is invalid. Set VITE_STRIPE_PAYMENT_LINK to a valid http(s) URL before opening checkout.'
@@ -663,20 +698,14 @@ export default function App() {
 
       try {
         stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
+        stripePopupBlocked = !stripeWindow
       } catch (popupOpenErr) {
+        stripePopupBlocked = true
         console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
       }
 
-      stripePopupBlocked = !stripeWindow
       if (stripePopupBlocked) {
-        alert('Your browser blocked the Stripe checkout popup. Please allow popups and try again.')
-        console.error('Stripe checkout popup was blocked or failed to open.', {
-          stripePopupBlocked,
-          stripeWindowOpen: Boolean(stripeWindow),
-          stripeWindowClosed: stripeWindow ? stripeWindow.closed : null,
-          stripePaymentLinkConfigured: Boolean(STRIPE_PAYMENT_LINK),
-        })
-        setSubscriptionResult('Stripe checkout popup was blocked. Use the fallback checkout link below to complete payment.')
+        console.info('Stripe checkout popup was blocked. A fallback link will be shown after the subscription is saved.')
       } else {
         try {
           stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
@@ -719,8 +748,8 @@ export default function App() {
       setSubscriptionResult(
         STRIPE_PAYMENT_LINK
           ? stripePopupBlocked
-            ? 'Stripe checkout popup was blocked. Subscription record saved in Supabase. Use the fallback checkout link below to complete payment.'
-            : 'Subscription record saved in Supabase and Stripe checkout opened.'
+            ? popupBlockedMessage
+            : 'Subscription record saved in Supabase and Stripe checkout opened in a new tab.'
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.',
       )
     } catch (err) {
@@ -741,14 +770,52 @@ export default function App() {
       const message = configErrorMessage ?? `Subscription save failed: ${err?.message || String(err)}`
       setError(message)
       setSubscriptionResult(
-        stripePopupBlocked
-          ? `${message} The Stripe popup was blocked, so use the fallback checkout link below to continue payment.`
+        STRIPE_PAYMENT_LINK
+          ? stripePopupBlocked
+            ? `${message} The checkout popup was blocked, so use the fallback link below to continue payment.`
+            : message
           : message,
       )
     } finally {
       if (mountedRef.current) {
         setSubmittingSubscription(false)
       }
+    }
+  }
+
+  async function handleCopyFeedback() {
+    if (!markResult) {
+      return
+    }
+
+    const summary = String(markResult.summary ?? '').trim()
+    const feedbackText = `Score: ${markResult.score} / ${markResult.maxMarks}\nSummary: ${summary}`
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(feedbackText)
+      } else {
+        const helper = document.createElement('textarea')
+        helper.value = feedbackText
+        helper.setAttribute('readonly', 'true')
+        helper.style.position = 'fixed'
+        helper.style.top = '-9999px'
+        helper.style.left = '-9999px'
+        helper.style.opacity = '0'
+        document.body.appendChild(helper)
+        helper.focus()
+        helper.select()
+        const copied = document.execCommand('copy')
+        document.body.removeChild(helper)
+        if (!copied) {
+          throw new Error('Clipboard copy was blocked.')
+        }
+      }
+
+      setCopyFeedbackStatus('Feedback copied to clipboard.')
+    } catch (copyErr) {
+      console.error('Could not copy feedback to clipboard:', copyErr)
+      setCopyFeedbackStatus('Could not copy automatically. Please copy the score and summary manually.')
     }
   }
 
@@ -871,6 +938,16 @@ export default function App() {
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <p className="muted" style={{ margin: 0, flex: '1 1 220px' }}>{ocrStatus}</p>
+              {ocrRetryAvailable ? (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={ocrLoading}
+                  onClick={() => void handleOcrRetry()}
+                >
+                  Retry OCR
+                </button>
+              ) : null}
               {uploadPreview ? (
                 <button
                   type="button"
@@ -923,6 +1000,10 @@ export default function App() {
                 <span> / {markResult.maxMarks} marks</span>
               </div>
               <p>{markResult.summary}</p>
+              <button type="button" className="copy-button" onClick={() => void handleCopyFeedback()}>
+                Copy feedback
+              </button>
+              {copyFeedbackStatus ? <p className="result-note" aria-live="polite">{copyFeedbackStatus}</p> : null}
               {markResult.ao1?.length ? (
                 <div>
                   <h3>AO1</h3>
@@ -958,6 +1039,7 @@ export default function App() {
             <a href="https://www.aqa.org.uk/find-past-papers-and-mark-schemes" target="_blank" rel="noreferrer">AQA</a>
             <a href="https://qualifications.pearson.com/en/support/support-topics/exams/past-papers.html" target="_blank" rel="noreferrer">Pearson Edexcel</a>
             <a href="https://www.ocr.org.uk/qualifications/past-paper-finder/" target="_blank" rel="noreferrer">OCR</a>
+            <a href={BOARD_LINKS.CCEA.href} target="_blank" rel="noreferrer">CCEA</a>
           </div>
         </section>
       </main>
