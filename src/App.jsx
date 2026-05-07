@@ -367,10 +367,6 @@ export default function App() {
   }, [resetMarkingContext, revokeUploadPreview])
 
   useEffect(() => {
-    resetMarkingContext()
-  }, [board, mode, topBand, resetMarkingContext])
-
-  useEffect(() => {
     if (SUPABASE_CONFIG_ERROR && !configErrorLoggedRef.current) {
       configErrorLoggedRef.current = true
       console.error(`${APP_NAME} configuration error: ${SUPABASE_CONFIG_ERROR}`)
@@ -592,6 +588,7 @@ export default function App() {
       return
     }
 
+    resetMarkingContext()
     markRequestInFlightRef.current = true
     setMarking(true)
     try {

@@ -333,6 +333,18 @@ textarea { resize: vertical; min-height: 110px; }
   padding: 16px;
   display: grid;
   gap: 16px;
+  animation: result-card-fade-in 180ms ease-out;
+  will-change: opacity, transform;
+}
+@keyframes result-card-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .result-score {
   display: flex;
