@@ -354,6 +354,10 @@ export default function App() {
     setError(null)
   }, [])
 
+  useEffect(() => {
+    resetMarkingContext()
+  }, [board, mode, topBand, resetMarkingContext])
+
   const clearUpload = useCallback(() => {
     uploadRequestIdRef.current += 1
     revokeUploadPreview()
@@ -552,7 +556,6 @@ export default function App() {
     setSubscriptionsError(null)
     setCopyFeedbackStatus('')
 
-    const scoringContextVersionAtStart = scoringContextVersionRef.current
     const trimmedQuestion = questionText.trim()
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
@@ -589,6 +592,7 @@ export default function App() {
     }
 
     resetMarkingContext()
+    const scoringContextVersionAtStart = scoringContextVersionRef.current
     markRequestInFlightRef.current = true
     setMarking(true)
     try {
