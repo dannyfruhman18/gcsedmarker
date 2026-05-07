@@ -107,13 +107,19 @@ export async function supabaseRequest(path, options = {}, signal) {
     headers['Content-Type'] = 'application/json'
   }
 
+  const fetchOptions = {
+    ...options,
+    signal: signal ?? options.signal,
+    headers,
+  }
+
+  if (hasBody && headers['Content-Type'] === 'application/json' && typeof options.body === 'object') {
+    fetchOptions.body = JSON.stringify(options.body)
+  }
+
   let response
   try {
-    response = await fetch(requestUrl, {
-      ...options,
-      signal: signal ?? options.signal,
-      headers,
-    })
+    response = await fetch(requestUrl, fetchOptions)
   } catch (error) {
     throw new Error(
       `Supabase request to ${requestPath} failed before a response was received: ${error?.message || String(error)}`,
