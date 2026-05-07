@@ -112,6 +112,7 @@ export default function App() {
   const pendingOcrFileRef = useRef(null)
   const uploadPreviewRef = useRef('')
   const markRequestInFlightRef = useRef(false)
+  const scoringContextVersionRef = useRef(0)
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -346,6 +347,13 @@ export default function App() {
     URL.revokeObjectURL(previewUrl)
   }, [])
 
+  const resetMarkingContext = useCallback(() => {
+    scoringContextVersionRef.current += 1
+    setMarkResult(null)
+    setCopyFeedbackStatus('')
+    setError(null)
+  }, [])
+
   const clearUpload = useCallback(() => {
     uploadRequestIdRef.current += 1
     revokeUploadPreview()
@@ -353,11 +361,14 @@ export default function App() {
     setOcrRetryAvailable(false)
     setUploadName('')
     setUploadPreview('')
-    setMarkResult(null)
-    setCopyFeedbackStatus('')
+    resetMarkingContext()
     setOcrStatus('Upload an image and OCR will fill the question box.')
     setOcrLoading(false)
-  }, [revokeUploadPreview])
+  }, [resetMarkingContext, revokeUploadPreview])
+
+  useEffect(() => {
+    resetMarkingContext()
+  }, [board, mode, topBand, resetMarkingContext])
 
   useEffect(() => {
     if (SUPABASE_CONFIG_ERROR && !configErrorLoggedRef.current) {
@@ -545,6 +556,7 @@ export default function App() {
     setSubscriptionsError(null)
     setCopyFeedbackStatus('')
 
+    const scoringContextVersionAtStart = scoringContextVersionRef.current
     const trimmedQuestion = questionText.trim()
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
@@ -586,12 +598,12 @@ export default function App() {
       const refreshedSubscriptions = hasSubscriptionEmail
         ? await loadSubscriptions(normalizedMarkEmail, { updateRecentSubscriptions: false })
         : []
-      if (!mountedRef.current) return
+      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
 
       const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && subscriptionLoadFailed) {
         const message = 'Subscription status could not be verified. Please refresh status and try again.'
-        if (mountedRef.current) {
+        if (mountedRef.current && scoringContextVersionRef.current === scoringContextVersionAtStart) {
           window.scrollTo(0, 0)
           setError(message)
         }
@@ -603,7 +615,7 @@ export default function App() {
         : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
 
       if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !hasActiveSubscription) {
-        if (mountedRef.current) {
+        if (mountedRef.current && scoringContextVersionRef.current === scoringContextVersionAtStart) {
           const subscriptionRequiredMessage = 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.'
           window.scrollTo(0, 0)
           setError(subscriptionRequiredMessage)
@@ -618,7 +630,7 @@ export default function App() {
         topBand,
         board,
       })
-      if (!mountedRef.current) return
+      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
       setMarkResult(result)
 
       await supabaseRequest('/rest/v1/marking_sessions', {
@@ -636,13 +648,13 @@ export default function App() {
           },
         ],
       })
-      if (!mountedRef.current) return
+      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
 
       setError(null)
       await loadSessions()
     } catch (err) {
       console.error('Marking answer failed:', err)
-      if (!mountedRef.current) return
+      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
 
       window.scrollTo(0, 0)
       const configErrorMessage = getSupabaseConfigErrorMessage(err)
