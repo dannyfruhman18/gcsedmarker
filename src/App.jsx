@@ -113,6 +113,7 @@ export default function App() {
   const uploadPreviewRef = useRef('')
   const markRequestInFlightRef = useRef(false)
   const scoringContextVersionRef = useRef(0)
+  const questionTextAutoFilledRef = useRef(false)
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -120,6 +121,8 @@ export default function App() {
     [subscriptionEmail],
   )
   const supabaseConfigMessage = SUPABASE_CONFIG_ERROR || ''
+  const stripePaymentLinkUrl = useMemo(() => getValidStripePaymentLink(STRIPE_PAYMENT_LINK), [])
+  const hasStripePaymentLink = Boolean(stripePaymentLinkUrl)
 
   const ensureOcrWorker = useCallback(async () => {
     if (workerRef.current) {
@@ -425,6 +428,11 @@ export default function App() {
       setUploadName('')
       setUploadPreview('')
       setOcrLoading(false)
+      if (questionTextAutoFilledRef.current) {
+        questionTextVersionRef.current += 1
+        setQuestionText('')
+        questionTextAutoFilledRef.current = false
+      }
       setOcrStatus('Unsupported file type. Please upload an image file (JPG, PNG, WebP, GIF, BMP, HEIC, or AVIF).')
       return
     }
@@ -438,7 +446,13 @@ export default function App() {
       setUploadName('')
       setUploadPreview('')
       setOcrLoading(false)
-      setOcrStatus('File is too large. Please upload an image smaller than 5MB.')
+      if (questionTextAutoFilledRef.current) {
+        questionTextVersionRef.current += 1
+        setQuestionText('')
+        questionTextAutoFilledRef.current = false
+      }
+      const maxUploadSizeMb = Math.round(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024))
+      setOcrStatus(`File is too large. Please upload an image smaller than ${maxUploadSizeMb}MB.`)
       return
     }
 
@@ -493,16 +507,20 @@ export default function App() {
         const extractedWordCount = extracted.split(/\s+/).filter(Boolean).length
         if (questionTextVersionRef.current === questionTextVersionAtStart) {
           setQuestionText(extracted)
+          questionTextAutoFilledRef.current = true
           setOcrStatus(`Text read from image (${extractedWordCount} words).`)
         } else {
+          questionTextAutoFilledRef.current = false
           setOcrStatus(
             `OCR complete (${extractedWordCount} words). We kept your manual question edits so you can keep refining the prompt below.`,
           )
         }
       } else if (questionTextVersionRef.current === questionTextVersionAtStart) {
         setQuestionText('')
+        questionTextAutoFilledRef.current = false
         setOcrStatus('No clear text found. Question text was cleared, so you can type it manually.')
       } else {
+        questionTextAutoFilledRef.current = false
         setOcrStatus('No clear text found. Your manual question edits were kept.')
       }
 
@@ -516,7 +534,7 @@ export default function App() {
       const initFailure = !workerRef.current
       const ocrErrorMessage = initFailure
         ? `OCR could not start: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
-        : `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under 5MB.`
+        : `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under ${Math.round(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024))}MB.`
       setOcrRetryAvailable(true)
       setError(ocrErrorMessage)
       setOcrStatus(ocrErrorMessage)
@@ -576,7 +594,7 @@ export default function App() {
       return
     }
 
-    if (STRIPE_PAYMENT_LINK && !hasSubscriptionEmail) {
+    if (hasStripePaymentLink && !hasSubscriptionEmail) {
       window.scrollTo(0, 0)
       setError('Add a subscriber email before marking when Stripe payments are enabled.')
       return
@@ -598,7 +616,7 @@ export default function App() {
       if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
 
       const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
-      if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && subscriptionLoadFailed) {
+      if (hasStripePaymentLink && hasSubscriptionEmail && subscriptionLoadFailed) {
         const message = 'Subscription status could not be verified. Please refresh status and try again.'
         if (mountedRef.current && scoringContextVersionRef.current === scoringContextVersionAtStart) {
           window.scrollTo(0, 0)
@@ -611,7 +629,7 @@ export default function App() {
         ? true
         : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
 
-      if (STRIPE_PAYMENT_LINK && hasSubscriptionEmail && !hasActiveSubscription) {
+      if (hasStripePaymentLink && hasSubscriptionEmail && !hasActiveSubscription) {
         if (mountedRef.current && scoringContextVersionRef.current === scoringContextVersionAtStart) {
           const subscriptionRequiredMessage = 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.'
           window.scrollTo(0, 0)
@@ -678,29 +696,28 @@ export default function App() {
     setSubscriptionsError(null)
     setShowStripeFallback(false)
 
+    if (STRIPE_PAYMENT_LINK && !stripePaymentLinkUrl) {
+      const message =
+        'Stripe payment link is invalid. Set VITE_STRIPE_PAYMENT_LINK to a valid http(s) URL before opening checkout.'
+      console.error(message, { stripePaymentLink: STRIPE_PAYMENT_LINK })
+      setError(message)
+      setSubscriptionResult(message)
+      return
+    }
+
     const email = normalizeEmail(subscriptionEmail)
     if (!email || !EMAIL_ADDRESS_REGEX.test(email)) {
       setSubscriptionResult('Add a valid email address.')
       return
     }
 
-    const stripePaymentLinkUrl = getValidStripePaymentLink(STRIPE_PAYMENT_LINK)
-    const hasStripePaymentLink = Boolean(STRIPE_PAYMENT_LINK)
+    const hasStripeCheckout = Boolean(stripePaymentLinkUrl)
     let stripeWindow = null
     let stripePopupBlocked = false
     const popupBlockedMessage =
       'Stripe checkout popup was blocked by your browser. The subscription was saved in Supabase, and you can use the fallback link below to complete payment.'
 
-    if (hasStripePaymentLink) {
-      if (!stripePaymentLinkUrl) {
-        const message =
-          'Stripe payment link is invalid. Set VITE_STRIPE_PAYMENT_LINK to a valid http(s) URL before opening checkout.'
-        console.error(message, { stripePaymentLink: STRIPE_PAYMENT_LINK })
-        setError(message)
-        setSubscriptionResult(message)
-        return
-      }
-
+    if (hasStripeCheckout) {
       try {
         stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
         stripePopupBlocked = !stripeWindow
@@ -731,9 +748,9 @@ export default function App() {
           {
             email,
             plan: subscriptionPlan,
-            status: STRIPE_PAYMENT_LINK ? 'pending_payment' : 'active',
-            provider: STRIPE_PAYMENT_LINK ? 'stripe_link' : 'supabase_demo',
-            notes: STRIPE_PAYMENT_LINK ? 'User sent to Stripe checkout link.' : 'No Stripe link configured yet.',
+            status: hasStripeCheckout ? 'pending_payment' : 'active',
+            provider: hasStripeCheckout ? 'stripe_link' : 'supabase_demo',
+            notes: hasStripeCheckout ? 'User sent to Stripe checkout link.' : 'No Stripe link configured yet.',
           },
         ],
       })
@@ -753,7 +770,7 @@ export default function App() {
 
       setError(null)
       setSubscriptionResult(
-        STRIPE_PAYMENT_LINK
+        hasStripeCheckout
           ? stripePopupBlocked
             ? popupBlockedMessage
             : 'Subscription record saved in Supabase and Stripe checkout opened in a new tab.'
@@ -771,7 +788,7 @@ export default function App() {
       const message = configErrorMessage ?? `Subscription save failed: ${err?.message || String(err)}`
       setError(message)
       setSubscriptionResult(
-        STRIPE_PAYMENT_LINK
+        hasStripeCheckout
           ? stripePopupBlocked
             ? `${message} The checkout popup was blocked, so use the fallback link below to continue payment.`
             : message
@@ -850,7 +867,7 @@ export default function App() {
             <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
             <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
             <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
-            <div className="stat"><span>Paywall</span><strong>{STRIPE_PAYMENT_LINK ? 'On' : 'Demo'}</strong></div>
+            <div className="stat"><span>Paywall</span><strong>{STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'On' : 'Invalid') : 'Demo'}</strong></div>
           </div>
         </div>
       </header>
@@ -969,6 +986,7 @@ export default function App() {
               <textarea
                 value={questionText}
                 onChange={(e) => {
+                  questionTextAutoFilledRef.current = false
                   questionTextVersionRef.current += 1
                   setQuestionText(e.target.value)
                 }}
@@ -1072,14 +1090,14 @@ export default function App() {
             </label>
             <p className="muted">{subscriptionPlans.find((plan) => plan.id === subscriptionPlan)?.access}</p>
             <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
-              {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? 'Open Stripe checkout' : 'Create subscription record'}
+              {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'Open Stripe checkout' : 'Checkout config invalid') : 'Create subscription record'}
             </button>
             <button className="secondary" onClick={() => void refreshSubscriptionStatus()}>
               Refresh Status
             </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
-            {showStripeFallback && STRIPE_PAYMENT_LINK ? (
-              <a className="chip-link" href={STRIPE_PAYMENT_LINK} target="_blank" rel="noreferrer">
+            {showStripeFallback && hasStripePaymentLink && stripePaymentLinkUrl ? (
+              <a className="chip-link" href={stripePaymentLinkUrl.href} target="_blank" rel="noreferrer">
                 Open Stripe checkout in a new tab
               </a>
             ) : null}
