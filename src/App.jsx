@@ -977,7 +977,15 @@ export default function App() {
                 </button>
               ) : null}
             </div>
-            {uploadPreview ? <img className="preview" src={uploadPreview} alt="Uploaded question preview" /> : null}
+            <div className="preview-container">
+              {uploadPreview ? (
+                <img className="preview" src={uploadPreview} alt="Uploaded question preview" />
+              ) : (
+                <div className="preview-placeholder" aria-hidden="true">
+                  Preview will appear here after an image is uploaded.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="textareas">
