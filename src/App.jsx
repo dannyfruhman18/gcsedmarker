@@ -333,13 +333,16 @@ export default function App() {
 
   const clearUpload = useCallback(() => {
     uploadRequestIdRef.current += 1
+    if (uploadPreview) {
+      URL.revokeObjectURL(uploadPreview)
+    }
     pendingOcrFileRef.current = null
     setOcrRetryAvailable(false)
     setUploadName('')
     setUploadPreview('')
     setOcrStatus('Upload an image and OCR will fill the question box.')
     setOcrLoading(false)
-  }, [])
+  }, [uploadPreview])
 
   useEffect(() => {
     if (SUPABASE_CONFIG_ERROR && !configErrorLoggedRef.current) {

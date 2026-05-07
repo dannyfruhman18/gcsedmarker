@@ -356,7 +356,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
 
   if (!text) {
     return {
-      maxMarks: 10,
+      maxMarks: 9,
       score: 0,
       ao1: ['You are ready to begin — paste the working or final answer and we will help identify the method marks.'],
       ao2: ['A few steps are enough to start; adding them will make the process feedback more precise.'],
@@ -468,7 +468,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   }
 
   return {
-    maxMarks: 10,
+    maxMarks: 9,
     score: Math.min(score, 10),
     ao1: ['Method marks are awarded for the steps, working, and correct structure you show.'],
     ao2: ['Explain each step clearly, especially when moving from formula to substitution to answer.'],
