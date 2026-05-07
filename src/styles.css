@@ -1,39 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-:root {
-  color-scheme: dark;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --color-page-gradient-start: #07111f;
-  --color-page-gradient-end: #091423;
-  --color-text: #eef4ff;
-  --color-text-muted: #a9bddb;
-  --color-text-secondary: #c5d4eb;
-  --color-text-soft: #d9e4f8;
-  --color-text-soft-2: #dbe5f7;
-  --color-link: #8ec5ff;
-  --color-brand: #8dd0ff;
-  --color-error: #ff9e9e;
-  --color-text-dark: #07111f;
-  --color-accent-start: #6ea8ff;
-  --color-accent-end: #51e1c8;
-  --surface-panel: rgba(10, 17, 31, 0.78);
-  --surface-panel-border: rgba(142, 197, 255, 0.12);
-  --surface-panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
-  --surface-chip-border: rgba(142, 197, 255, 0.16);
-  --surface-chip-bg: rgba(255, 255, 255, 0.04);
-  --surface-input-border: rgba(142, 197, 255, 0.14);
-  --surface-input-border-strong: rgba(142, 197, 255, 0.4);
-  --surface-soft: rgba(255, 255, 255, 0.04);
-  --surface-soft-hover: rgba(255, 255, 255, 0.05);
-  --surface-soft-subtle: rgba(255, 255, 255, 0.02);
-  --surface-dashed-border: rgba(142, 197, 255, 0.2);
-  --focus-ring: #8ec5ff;
-  --focus-shadow: rgba(142, 197, 255, 0.25);
-  color: var(--color-text);
-}
-
-* { box-sizing: border-box; }
 html, body, #root { min-height: 100dvh; }
+html, body { overflow-x: hidden; }
 body {
   margin: 0;
   min-height: 100dvh;

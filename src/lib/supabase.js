@@ -36,6 +36,29 @@ function normaliseRequestPath(path) {
   return value.startsWith('/') ? value : `/${value}`
 }
 
+function canUseBodyAsIs(body) {
+  return (
+    typeof body === 'string' ||
+    (typeof Blob !== 'undefined' && body instanceof Blob) ||
+    (typeof FormData !== 'undefined' && body instanceof FormData) ||
+    (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
+    (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) ||
+    ArrayBuffer.isView(body) ||
+    (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream)
+  )
+}
+
+function shouldDefaultJsonContentType(body) {
+  return !(
+    (typeof Blob !== 'undefined' && body instanceof Blob) ||
+    (typeof FormData !== 'undefined' && body instanceof FormData) ||
+    (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
+    (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) ||
+    ArrayBuffer.isView(body) ||
+    (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream)
+  )
+}
+
 export function safeParseJson(text) {
   if (!text) return null
 
@@ -97,15 +120,9 @@ export async function supabaseRequest(path, options = {}, signal) {
   const requestPath = normaliseRequestPath(path)
   const requestUrl = `${SUPABASE_BASE_URL.replace(/\/+$/, '')}${requestPath}`
   const hasBody = options.body !== undefined && options.body !== null
-  const headers = {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    ...options.headers,
-  }
-
-  if (hasBody && !('Content-Type' in headers) && !('content-type' in headers)) {
-    headers['Content-Type'] = 'application/json'
-  }
+  const headers = new Headers(options.headers ?? {})
+  headers.set('apikey', SUPABASE_ANON_KEY)
+  headers.set('Authorization', `Bearer ${SUPABASE_ANON_KEY}`)
 
   const fetchOptions = {
     ...options,
@@ -113,8 +130,22 @@ export async function supabaseRequest(path, options = {}, signal) {
     headers,
   }
 
-  if (hasBody && headers['Content-Type'] === 'application/json' && typeof options.body === 'object') {
-    fetchOptions.body = JSON.stringify(options.body)
+  if (hasBody) {
+    const hasContentType = Boolean(headers.get('content-type'))
+
+    if (!hasContentType && shouldDefaultJsonContentType(options.body)) {
+      headers.set('Content-Type', 'application/json')
+    }
+
+    if (!canUseBodyAsIs(options.body)) {
+      try {
+        fetchOptions.body = JSON.stringify(options.body)
+      } catch (stringifyError) {
+        throw new Error(
+          `Supabase request to ${requestPath} could not serialize the request body as JSON: ${stringifyError?.message || String(stringifyError)}`,
+        )
+      }
+    }
   }
 
   let response
