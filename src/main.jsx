@@ -5,7 +5,6 @@ import ErrorBoundary from './components/ErrorBoundary'
 import './styles.css'
 import { APP_NAME } from './lib/constants'
 
-// Trigger a safe redeploy so Vercel can pick up the latest main-branch state.
 const rootElement = document.getElementById('root')
 
 if (!rootElement) {
