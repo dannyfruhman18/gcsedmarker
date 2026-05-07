@@ -1,3 +1,9 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html, body, #root { min-height: 100dvh; }
 html, body { overflow-x: hidden; }
 body {
@@ -56,6 +62,11 @@ button:disabled {
   box-shadow: var(--surface-panel-shadow);
   backdrop-filter: blur(14px);
   min-width: 0;
+}
+
+.hero,
+.panel {
+  overflow: hidden;
 }
 
 .hero {
@@ -420,6 +431,16 @@ textarea { resize: vertical; min-height: 110px; }
     background: rgba(255, 255, 255, 0.06);
   }
 }
+
+.primary:active,
+.secondary:active,
+.copy-button:active,
+.chip-link:active,
+.upload-button:active {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+}
+
 @media (max-width: 1100px) and (min-width: 641px) {
   .stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
