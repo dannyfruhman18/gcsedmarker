@@ -110,6 +110,7 @@ export default function App() {
   const ocrProgressHandlerRef = useRef(null)
   const pendingOcrFileRef = useRef(null)
   const uploadPreviewRef = useRef('')
+  const markRequestInFlightRef = useRef(false)
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -396,6 +397,8 @@ export default function App() {
   }, [loadSessions, loadSubscriptions])
 
   async function handleFileChange(file) {
+    setError(null)
+
     if (!file) return
 
     const isImageType = Boolean(
@@ -504,7 +507,7 @@ export default function App() {
       const ocrErrorMessage = initFailure
         ? `OCR could not start: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
         : `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under 5MB.`
-      setOcrRetryAvailable(initFailure)
+      setOcrRetryAvailable(true)
       setError(ocrErrorMessage)
       setOcrStatus(ocrErrorMessage)
     } finally {
@@ -530,7 +533,10 @@ export default function App() {
   }
 
   async function handleMark() {
-    setMarkResult(null)
+    if (markRequestInFlightRef.current) {
+      return
+    }
+
     setError(null)
     setSessionsError(null)
     setSubscriptionsError(null)
@@ -542,40 +548,36 @@ export default function App() {
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
 
     if (!trimmedQuestion && !trimmedAnswer) {
-      setMarkResult(null)
       window.scrollTo(0, 0)
       setError('Add a question and an answer before marking.')
       return
     }
 
     if (!trimmedQuestion) {
-      setMarkResult(null)
       window.scrollTo(0, 0)
       setError('Add a question or prompt before marking so the answer has context.')
       return
     }
 
     if (!trimmedAnswer) {
-      setMarkResult(null)
       window.scrollTo(0, 0)
       setError('Add a student answer, essay, or working before marking.')
       return
     }
 
     if (STRIPE_PAYMENT_LINK && !hasSubscriptionEmail) {
-      setMarkResult(null)
       window.scrollTo(0, 0)
       setError('Add a subscriber email before marking when Stripe payments are enabled.')
       return
     }
 
     if (hasSubscriptionEmail && !EMAIL_ADDRESS_REGEX.test(normalizedMarkEmail)) {
-      setMarkResult(null)
       window.scrollTo(0, 0)
       setError('Add a valid email address before marking, or leave it blank for demo mode.')
       return
     }
 
+    markRequestInFlightRef.current = true
     setMarking(true)
     try {
       const refreshedSubscriptions = hasSubscriptionEmail
@@ -589,14 +591,6 @@ export default function App() {
         if (mountedRef.current) {
           window.scrollTo(0, 0)
           setError(message)
-          setMarkResult({
-            score: 0,
-            maxMarks: mode === 'essay' ? 6 : 9,
-            summary: message,
-            ao1: ['We could not confirm subscription access just now. Please refresh status and try again.'],
-            ao2: [],
-            ao3: [],
-          })
         }
         return
       }
@@ -610,14 +604,6 @@ export default function App() {
           const subscriptionRequiredMessage = 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.'
           window.scrollTo(0, 0)
           setError(subscriptionRequiredMessage)
-          setMarkResult({
-            score: 0,
-            maxMarks: mode === 'essay' ? 6 : 9,
-            summary: subscriptionRequiredMessage,
-            ao1: ['This workspace is currently configured to require an active subscription before marking.'],
-            ao2: [],
-            ao3: [],
-          })
         }
         return
       }
@@ -666,6 +652,7 @@ export default function App() {
         storageError: message,
       }))
     } finally {
+      markRequestInFlightRef.current = false
       if (mountedRef.current) {
         setMarking(false)
       }
