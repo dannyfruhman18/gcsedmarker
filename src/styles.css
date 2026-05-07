@@ -38,13 +38,18 @@
 }
 
 html, body, #root { min-height: 100dvh; }
-html, body { overflow-x: hidden; }
 body {
   margin: 0;
   min-height: 100dvh;
   background: linear-gradient(180deg, var(--color-page-gradient-start) 0%, var(--color-page-gradient-end) 100%);
 }
-a { color: var(--color-link); text-decoration: none; }
+a {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(147, 197, 253, 0.3);
+  transition: text-decoration-color 0.2s;
+}
 img, video {
   display: block;
   max-width: 100%;
@@ -319,7 +324,7 @@ textarea { resize: vertical; min-height: 110px; }
   border-radius: 8px;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
   margin-top: 4px;
   margin-left: auto;
   touch-action: manipulation;
@@ -334,7 +339,6 @@ textarea { resize: vertical; min-height: 110px; }
   display: grid;
   gap: 16px;
   animation: result-card-fade-in 180ms ease-out;
-  will-change: opacity, transform;
 }
 @keyframes result-card-fade-in {
   from {
@@ -440,7 +444,9 @@ textarea { resize: vertical; min-height: 110px; }
   overflow-wrap: anywhere;
 }
 @media (hover: hover) {
-  a:hover { text-decoration: underline; }
+  a:hover {
+    text-decoration-color: rgba(147, 197, 253, 0.8);
+  }
 
   button:disabled:hover {
     text-decoration: none;
@@ -450,7 +456,7 @@ textarea { resize: vertical; min-height: 110px; }
     background: rgba(255, 255, 255, 0.08);
     border-color: var(--surface-input-border-strong);
     transform: translateY(-1px) scale(1.015);
-    text-decoration: none;
+    text-decoration-color: rgba(147, 197, 253, 0.8);
   }
 
   .upload-button:hover {
