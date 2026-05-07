@@ -38,7 +38,6 @@ body {
   background: linear-gradient(180deg, var(--color-page-gradient-start) 0%, var(--color-page-gradient-end) 100%);
 }
 a { color: var(--color-link); text-decoration: none; }
-a:hover { text-decoration: underline; }
 img, video {
   display: block;
   max-width: 100%;
@@ -55,9 +54,6 @@ button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
   filter: saturate(0.85);
-}
-button:disabled:hover {
-  text-decoration: none;
 }
 
 .visually-hidden {
@@ -150,12 +146,6 @@ h1 {
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   transform-origin: center;
 }
-.chip-link:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--surface-input-border-strong);
-  transform: translateY(-1px) scale(1.015);
-  text-decoration: none;
-}
 .stat-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -244,10 +234,6 @@ select, textarea, input[type='email'] {
 .upload-button span {
   display: block;
 }
-.upload-button:hover {
-  background: var(--surface-soft-hover);
-  border-color: var(--surface-input-border-strong);
-}
 textarea { resize: vertical; min-height: 110px; }
 .toggle {
   cursor: pointer;
@@ -315,14 +301,6 @@ textarea { resize: vertical; min-height: 110px; }
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
-.copy-button:hover {
-  background: var(--surface-soft-hover);
-  border-color: var(--surface-input-border-strong);
-  transform: translateY(-1px);
-}
-.copy-button:active {
-  transform: translateY(1px);
-}
 .clear-button {
   background: var(--surface-soft-subtle);
   color: var(--color-text-muted);
@@ -335,11 +313,6 @@ textarea { resize: vertical; min-height: 110px; }
   margin-top: 4px;
   margin-left: auto;
   touch-action: manipulation;
-}
-.clear-button:hover {
-  background: var(--surface-soft-hover);
-  color: var(--color-text);
-  border-color: var(--surface-input-border-strong);
 }
 .clear-button:active {
   transform: translateY(1px);
@@ -443,6 +416,41 @@ textarea { resize: vertical; min-height: 110px; }
   display: inline-block;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+@media (hover: hover) {
+  a:hover { text-decoration: underline; }
+
+  button:disabled:hover {
+    text-decoration: none;
+  }
+
+  .chip-link:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--surface-input-border-strong);
+    transform: translateY(-1px) scale(1.015);
+    text-decoration: none;
+  }
+
+  .upload-button:hover {
+    background: var(--surface-soft-hover);
+    border-color: var(--surface-input-border-strong);
+  }
+
+  .copy-button:hover {
+    background: var(--surface-soft-hover);
+    border-color: var(--surface-input-border-strong);
+    transform: translateY(-1px);
+  }
+
+  .clear-button:hover {
+    background: var(--surface-soft-hover);
+    color: var(--color-text);
+    border-color: var(--surface-input-border-strong);
+  }
+
+  .history-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
 }
 @media (max-width: 1100px) and (min-width: 641px) {
   .stat-row {
