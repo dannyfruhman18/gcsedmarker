@@ -90,6 +90,7 @@ export default function App() {
   const [subscriptionEmail, setSubscriptionEmail] = useState('')
   const [subscriptionPlan, setSubscriptionPlan] = useState('top-band')
   const [subscriptionResult, setSubscriptionResult] = useState('')
+  const [showStripeFallback, setShowStripeFallback] = useState(false)
   const [submittingSubscription, setSubmittingSubscription] = useState(false)
   const [error, setError] = useState(null)
   const [sessionsError, setSessionsError] = useState(null)
@@ -664,6 +665,7 @@ export default function App() {
     setSessionsError(null)
     setSubscriptionResult('')
     setSubscriptionsError(null)
+    setShowStripeFallback(false)
 
     const email = normalizeEmail(subscriptionEmail)
     if (!email || !EMAIL_ADDRESS_REGEX.test(email)) {
@@ -694,6 +696,10 @@ export default function App() {
       } catch (popupOpenErr) {
         stripePopupBlocked = true
         console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
+      }
+
+      if (stripePopupBlocked) {
+        setShowStripeFallback(true)
       }
 
       if (!stripePopupBlocked) {
@@ -926,7 +932,6 @@ export default function App() {
                 <button
                   type="button"
                   className="secondary"
-                  disabled={ocrLoading}
                   onClick={() => void handleOcrRetry()}
                 >
                   Retry OCR
@@ -936,7 +941,6 @@ export default function App() {
                 <button
                   type="button"
                   className="clear-button"
-                  disabled={ocrLoading}
                   onClick={clearUpload}
                 >
                   Clear
@@ -1060,7 +1064,7 @@ export default function App() {
               Refresh Status
             </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
-            {subscriptionResult.toLowerCase().includes('popup was blocked') && STRIPE_PAYMENT_LINK ? (
+            {showStripeFallback && STRIPE_PAYMENT_LINK ? (
               <a className="chip-link" href={STRIPE_PAYMENT_LINK} target="_blank" rel="noreferrer">
                 Open Stripe checkout in a new tab
               </a>
