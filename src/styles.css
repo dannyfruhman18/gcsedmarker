@@ -82,7 +82,7 @@ button:disabled {
 }
 
 .app-shell {
-  width: min(100%, 900px);
+  width: min(100%, 1100px);
   min-height: 100dvh;
   height: auto;
   margin: 0 auto;
@@ -180,7 +180,7 @@ h1 {
 
 .chat-layout {
   display: grid;
-  gap: 18px;
+  gap: 2rem;
   min-width: 0;
 }
 
