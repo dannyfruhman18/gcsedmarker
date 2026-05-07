@@ -621,7 +621,7 @@ export default function App() {
       await supabaseRequest('/rest/v1/marking_sessions', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
-        body: JSON.stringify([
+        body: [
           {
             exam_board: board,
             mode,
@@ -631,7 +631,7 @@ export default function App() {
             score: result.score,
             feedback: result,
           },
-        ]),
+        ],
       })
       if (!mountedRef.current) return
 
@@ -712,7 +712,7 @@ export default function App() {
       await supabaseRequest('/rest/v1/subscriptions', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
-        body: JSON.stringify([
+        body: [
           {
             email,
             plan: subscriptionPlan,
@@ -720,7 +720,7 @@ export default function App() {
             provider: STRIPE_PAYMENT_LINK ? 'stripe_link' : 'supabase_demo',
             notes: STRIPE_PAYMENT_LINK ? 'User sent to Stripe checkout link.' : 'No Stripe link configured yet.',
           },
-        ]),
+        ],
       })
 
       if (!mountedRef.current) return
