@@ -469,7 +469,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
 
   return {
     maxMarks: 9,
-    score: Math.min(score, 10),
+    score: Math.min(score, 9),
     ao1: ['Method marks are awarded for the steps, working, and correct structure you show.'],
     ao2: ['Explain each step clearly, especially when moving from formula to substitution to answer.'],
     ao3: ['If this is a science question, include the key scientific idea, correct units, and any required conclusion.'],
