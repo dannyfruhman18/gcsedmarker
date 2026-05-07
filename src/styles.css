@@ -115,7 +115,7 @@ button:disabled {
   gap: 14px;
   align-items: center;
 }
-.brand-logo { width: 4rem; height: 4rem; flex: 0 0 auto; }
+.brand-logo { width: 4rem; height: 4rem; flex: 0 0 auto; display: block; opacity: 1; }
 .eyebrow {
   margin: 0;
   text-transform: uppercase;

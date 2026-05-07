@@ -354,10 +354,6 @@ export default function App() {
     setError(null)
   }, [])
 
-  useEffect(() => {
-    resetMarkingContext()
-  }, [board, mode, topBand, resetMarkingContext])
-
   const clearUpload = useCallback(() => {
     uploadRequestIdRef.current += 1
     revokeUploadPreview()
@@ -556,6 +552,7 @@ export default function App() {
     setSubscriptionsError(null)
     setCopyFeedbackStatus('')
 
+    const scoringContextVersionAtStart = scoringContextVersionRef.current
     const trimmedQuestion = questionText.trim()
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
@@ -592,7 +589,6 @@ export default function App() {
     }
 
     resetMarkingContext()
-    const scoringContextVersionAtStart = scoringContextVersionRef.current
     markRequestInFlightRef.current = true
     setMarking(true)
     try {
@@ -829,7 +825,7 @@ export default function App() {
       <header className="hero">
         <div className="hero-card">
           <div className="brand-row">
-            <img src="/logo.svg" alt={`${APP_NAME} logo`} className="brand-logo" />
+            <img src="/logo.svg" alt={`${APP_NAME} logo`} className="brand-logo" width="64" height="64" loading="eager" decoding="async" />
             <div>
               <p className="eyebrow">{APP_NAME}</p>
               <h1>Upload a question, choose the board, and get mark-style feedback fast.</h1>
@@ -927,6 +923,8 @@ export default function App() {
               role="button"
               tabIndex={ocrLoading ? -1 : 0}
               aria-disabled={ocrLoading}
+              aria-label="Upload a scan or photo of the question"
+              aria-describedby="ocr-status"
               onKeyDown={(e) => {
                 if (ocrLoading) {
                   return
@@ -942,7 +940,7 @@ export default function App() {
             </label>
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <p className="muted" style={{ margin: 0, flex: '1 1 220px' }}>{ocrStatus}</p>
+              <p id="ocr-status" className="muted" aria-live="polite" style={{ margin: 0, flex: '1 1 220px' }}>{ocrStatus}</p>
               {ocrRetryAvailable ? (
                 <button
                   type="button"
