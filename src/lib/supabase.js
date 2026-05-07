@@ -36,19 +36,11 @@ function normaliseRequestPath(path) {
   return value.startsWith('/') ? value : `/${value}`
 }
 
-function canUseBodyAsIs(body) {
-  return (
-    typeof body === 'string' ||
-    (typeof Blob !== 'undefined' && body instanceof Blob) ||
-    (typeof FormData !== 'undefined' && body instanceof FormData) ||
-    (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
-    (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) ||
-    ArrayBuffer.isView(body) ||
-    (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream)
-  )
-}
+function shouldSerializeAsJson(body) {
+  if (body === null || typeof body !== 'object') {
+    return false
+  }
 
-function shouldDefaultJsonContentType(body) {
   return !(
     (typeof Blob !== 'undefined' && body instanceof Blob) ||
     (typeof FormData !== 'undefined' && body instanceof FormData) ||
@@ -131,13 +123,13 @@ export async function supabaseRequest(path, options = {}, signal) {
   }
 
   if (hasBody) {
-    const hasContentType = Boolean(headers.get('content-type'))
+    const shouldSerialize = shouldSerializeAsJson(options.body)
 
-    if (!hasContentType && shouldDefaultJsonContentType(options.body)) {
+    if (!headers.get('content-type') && shouldSerialize) {
       headers.set('Content-Type', 'application/json')
     }
 
-    if (!canUseBodyAsIs(options.body)) {
+    if (shouldSerialize) {
       try {
         fetchOptions.body = JSON.stringify(options.body)
       } catch (stringifyError) {
@@ -145,6 +137,8 @@ export async function supabaseRequest(path, options = {}, signal) {
           `Supabase request to ${requestPath} could not serialize the request body as JSON: ${stringifyError?.message || String(stringifyError)}`,
         )
       }
+    } else {
+      fetchOptions.body = options.body
     }
   }
 

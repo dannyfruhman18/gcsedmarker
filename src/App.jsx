@@ -146,8 +146,8 @@ export default function App() {
             if (!mountedRef.current) {
               try {
                 await worker.terminate()
-              } catch (terminateErr) {
-                console.warn('OCR worker cleanup failed during initialization:', terminateErr)
+              } catch {
+                // Ignore cleanup failures during worker initialization.
               }
               throw new Error('OCR worker initialization was cancelled.')
             }
@@ -696,9 +696,7 @@ export default function App() {
         console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
       }
 
-      if (stripePopupBlocked) {
-        console.info('Stripe checkout popup was blocked. A fallback link will be shown after the subscription is saved.')
-      } else {
+      if (!stripePopupBlocked) {
         try {
           stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
         } catch (popupWriteErr) {
@@ -746,12 +744,6 @@ export default function App() {
       )
     } catch (err) {
       console.error('Subscription save failed:', err)
-      console.error('Subscription popup state at failure:', {
-        stripePopupBlocked,
-        stripeWindowOpen: Boolean(stripeWindow),
-        stripeWindowClosed: stripeWindow ? stripeWindow.closed : null,
-        stripePaymentLinkConfigured: Boolean(STRIPE_PAYMENT_LINK),
-      })
       if (stripeWindow && !stripeWindow.closed) {
         stripeWindow.close()
       }
