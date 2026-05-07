@@ -589,7 +589,7 @@ export default function App() {
           setError(message)
           setMarkResult({
             score: 0,
-            maxMarks: mode === 'essay' ? 6 : 10,
+            maxMarks: mode === 'essay' ? 6 : 9,
             summary: message,
             ao1: ['We could not confirm subscription access just now. Please refresh status and try again.'],
             ao2: [],
@@ -610,7 +610,7 @@ export default function App() {
           setError(subscriptionRequiredMessage)
           setMarkResult({
             score: 0,
-            maxMarks: mode === 'essay' ? 6 : 10,
+            maxMarks: mode === 'essay' ? 6 : 9,
             summary: subscriptionRequiredMessage,
             ao1: ['This workspace is currently configured to require an active subscription before marking.'],
             ao2: [],
