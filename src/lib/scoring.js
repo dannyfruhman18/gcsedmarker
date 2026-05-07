@@ -216,6 +216,7 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
     legacyBoard,
   )
   const text = normaliseText(answerText)
+  const essayLength = text.split(/\s+/).filter(Boolean).length
   const questionAnalysis = buildQuestionAnalysis(questionText, text)
 
   if (!text) {
@@ -231,7 +232,7 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
     }
   }
 
-  const length = text.split(/\s+/).filter(Boolean).length
+  const length = essayLength
   const paragraphBreaks = (text.match(/\n\s*/g) ?? []).length
   const ao1 = []
   const ao2 = []
@@ -323,6 +324,9 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   }
 
   if (hasSustainedDevelopment) {
+    if (topBand && essayLength > 150) {
+      score += 1
+    }
     ao3.push('Sustained development across the response helps to secure the top band.')
     if (topBand) {
       ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
