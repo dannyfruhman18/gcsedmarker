@@ -119,7 +119,7 @@ const PROMPT_FAMILIES = [
     id: 'calculate',
     label: 'Calculate',
     questionPattern: /\b(calculate|work out|determine|find|show that|complete the calculation)\b/i,
-    responsePattern: /\b(\d|=|×|÷|working|formula|equation|substitut|solve|step(?:s)?|final answer)\b/i,
+    responsePattern: /\b(?:\d{2,}|\d+\.\d+|\d+\/\d+)\b|=|×|÷|working|formula|equation|substitut|solve|step(?:s)?|final answer/i,
   },
 ]
 
@@ -128,7 +128,7 @@ function normaliseText(value) {
 }
 
 function extractKeywords(text) {
-  const words = normaliseText(text).toLowerCase().match(/\b[a-z0-9]{2,}\b/g) ?? []
+  const words = normaliseText(text).toLowerCase().match(/\b(?:[a-z]|[a-z0-9]{2,})\b/g) ?? []
   return words.filter((word) => !QUESTION_STOPWORDS.has(word) && !/^\d+$/.test(word))
 }
 
@@ -385,7 +385,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   }
 
   let score = 0
-  const hasVisibleCalculation = /(?:\d+(?:\.\d+)?\s*[+\-×÷^]\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*=\s*\d+(?:\.\d+)?|=>|→)/.test(text)
+  const hasVisibleCalculation = /(?:\b(?:\d+(?:\.\d+)?[a-z]?|[a-z])\s*=\s*(?:\d+(?:\.\d+)?[a-z]?|[a-z])\b|\b[a-z0-9]+(?:\s*[+\-×÷^\/]\s*[a-z0-9]+)+\b|=>|→)/i.test(text)
   const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show\s+(?:your\s+work|the\s+working|working(?:\s+out)?)|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate|ans|units)\b|→|=>/i.test(text)
   const hasWorkingTrail = lines.length >= 2 && (hasVisibleCalculation || hasProcessLanguage)
   const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage
