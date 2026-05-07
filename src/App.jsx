@@ -325,7 +325,7 @@ export default function App() {
       return
     }
 
-    const rows = await loadSubscriptions(email, { updateRecentSubscriptions: true })
+    const rows = await loadSubscriptions(email, { updateRecentSubscriptions: false })
     if (rows === null) {
       setSubscriptionResult('Failed to refresh status.')
     } else {
