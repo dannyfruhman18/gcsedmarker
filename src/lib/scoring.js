@@ -234,16 +234,15 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   const ao3 = []
   let score = 0
 
-  const hasDevelopedLength = length >= 80
+  const hasAdequateLength = length >= 60
+  const hasSustainedDevelopment = length >= 120
   const hasEvidenceDetail = /\b(example|examples|evidence|quote|quotes|statistic|statistics|fact|facts|terminology|term|terms|detail|specific|specifically|context)\b/i.test(text)
   const hasReasoning = /\b(because|therefore|this shows|consequently|as a result|proves|suggests)\b/i.test(text)
   const hasEvaluation = /\b(however|although|overall|on the other hand|ultimately|to a large extent|judgement)\b/i.test(text)
   const hasStructure = paragraphBreaks >= 2
-  const hasSustainedDevelopment = length > 150
 
-  if (hasDevelopedLength) {
-    ao1.push('Clear subject knowledge shown with enough developed detail to reward.')
-    score += 1
+  if (hasAdequateLength) {
+    ao1.push('There is enough detail here to assess the main ideas.')
   } else if (length > 0) {
     ao1.push('Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
   }
@@ -316,17 +315,16 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
 
   if (hasSustainedDevelopment) {
     score += 1
-    if (topBand) {
-      score += 1
-    }
     ao3.push('Sustained development across the response helps to secure the top band.')
     if (topBand) {
       ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
       ao2.push('Top Band mode: use linked chains of reasoning and compare alternatives instead of listing points.')
       ao3.push('Top Band mode: refine paragraph sequencing, counterargument, and conclusion flow to maximise impact.')
     }
+  } else if (hasAdequateLength) {
+    ao3.push('Your answer has enough detail to assess, but it needs more sustained development to reach the top band.')
   } else if (topBand) {
-    ao3.push('Top Band feedback unlocks best when the essay is more fully developed (over 150 words). Add more detail and evaluation to push into the top band.')
+    ao3.push('Top Band feedback unlocks best when the essay is more fully developed (around 120 words or more).')
   }
 
   return {
@@ -338,7 +336,9 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
     summary: topBand
       ? hasSustainedDevelopment
         ? 'Grade 9 / Top Band focus: make every paragraph precise, conceptual, and evaluative.'
-        : 'Top Band mode is on, but this response needs more development (over 150 words) before full top-band feedback applies.'
+        : hasAdequateLength
+          ? 'Top Band mode is on, but this response needs more sustained development (120+ words) before full top-band feedback applies.'
+          : 'Top Band mode is on, but this response is still too brief for full top-band feedback.'
       : questionAnalysis.questionKeywords.length
         ? 'Focus on specific knowledge, explanation, and staying aligned to the question.'
         : 'Focus on specific knowledge, explanation, and a clear conclusion.',
