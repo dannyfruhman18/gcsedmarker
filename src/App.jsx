@@ -1037,10 +1037,11 @@ export default function App() {
 
           <div className="resource-box">
             <h3>Official mark-scheme links</h3>
-            <a href="https://www.aqa.org.uk/find-past-papers-and-mark-schemes" target="_blank" rel="noreferrer">AQA</a>
-            <a href="https://qualifications.pearson.com/en/support/support-topics/exams/past-papers.html" target="_blank" rel="noreferrer">Pearson Edexcel</a>
-            <a href="https://www.ocr.org.uk/qualifications/past-paper-finder/" target="_blank" rel="noreferrer">OCR</a>
-            <a href={BOARD_LINKS.CCEA.href} target="_blank" rel="noreferrer">CCEA</a>
+            {Object.entries(BOARD_LINKS).map(([id, link]) => (
+              <a key={id} href={link.href} target="_blank" rel="noreferrer">
+                {id}
+              </a>
+            ))}
           </div>
         </section>
       </main>
