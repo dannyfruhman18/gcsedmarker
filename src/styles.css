@@ -260,8 +260,11 @@ textarea { resize: vertical; min-height: 110px; }
 }
 .dropzone.loading {
   opacity: 0.6;
-  pointer-events: none;
   cursor: wait;
+}
+.dropzone.loading input[type='file'],
+.dropzone.loading .upload-button {
+  pointer-events: none;
 }
 .file-name { color: var(--color-text-muted); margin: 0; overflow-wrap: anywhere; }
 .preview {
@@ -520,6 +523,11 @@ textarea { resize: vertical; min-height: 110px; }
 @media (max-width: 640px) {
   .stat-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .stat-row {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 420px) {
