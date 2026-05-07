@@ -109,6 +109,7 @@ export default function App() {
   const workerInitPromiseRef = useRef(null)
   const ocrProgressHandlerRef = useRef(null)
   const pendingOcrFileRef = useRef(null)
+  const uploadPreviewRef = useRef('')
 
   const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
@@ -331,18 +332,28 @@ export default function App() {
     }
   }, [loadSubscriptions, normalizedSubscriptionEmail])
 
+  const revokeUploadPreview = useCallback((previewUrl = uploadPreviewRef.current) => {
+    if (!previewUrl) {
+      return
+    }
+
+    if (uploadPreviewRef.current === previewUrl) {
+      uploadPreviewRef.current = ''
+    }
+
+    URL.revokeObjectURL(previewUrl)
+  }, [])
+
   const clearUpload = useCallback(() => {
     uploadRequestIdRef.current += 1
-    if (uploadPreview) {
-      URL.revokeObjectURL(uploadPreview)
-    }
+    revokeUploadPreview()
     pendingOcrFileRef.current = null
     setOcrRetryAvailable(false)
     setUploadName('')
     setUploadPreview('')
     setOcrStatus('Upload an image and OCR will fill the question box.')
     setOcrLoading(false)
-  }, [uploadPreview])
+  }, [revokeUploadPreview])
 
   useEffect(() => {
     if (SUPABASE_CONFIG_ERROR && !configErrorLoggedRef.current) {
@@ -361,6 +372,10 @@ export default function App() {
       ocrProgressHandlerRef.current = null
       workerInitPromiseRef.current = null
       pendingOcrFileRef.current = null
+      if (uploadPreviewRef.current) {
+        URL.revokeObjectURL(uploadPreviewRef.current)
+        uploadPreviewRef.current = ''
+      }
       if (workerRef.current) {
         const worker = workerRef.current
         workerRef.current = null
@@ -370,14 +385,6 @@ export default function App() {
       }
     }
   }, [])
-
-  useEffect(() => {
-    return () => {
-      if (uploadPreview) {
-        URL.revokeObjectURL(uploadPreview)
-      }
-    }
-  }, [uploadPreview])
 
   useEffect(() => {
     if (SUPABASE_CONFIG_ERROR) {
@@ -401,9 +408,7 @@ export default function App() {
       ocrProgressHandlerRef.current = null
       pendingOcrFileRef.current = null
       setOcrRetryAvailable(false)
-      if (uploadPreview) {
-        URL.revokeObjectURL(uploadPreview)
-      }
+      revokeUploadPreview()
       setUploadName('')
       setUploadPreview('')
       setOcrLoading(false)
@@ -416,9 +421,7 @@ export default function App() {
       ocrProgressHandlerRef.current = null
       pendingOcrFileRef.current = null
       setOcrRetryAvailable(false)
-      if (uploadPreview) {
-        URL.revokeObjectURL(uploadPreview)
-      }
+      revokeUploadPreview()
       setUploadName('')
       setUploadPreview('')
       setOcrLoading(false)
@@ -433,11 +436,10 @@ export default function App() {
     pendingOcrFileRef.current = file
     setOcrRetryAvailable(false)
 
-    if (uploadPreview) {
-      URL.revokeObjectURL(uploadPreview)
-    }
+    revokeUploadPreview()
 
     const nextPreview = URL.createObjectURL(file)
+    uploadPreviewRef.current = nextPreview
     setOcrLoading(true)
     setUploadName(file.name)
     setUploadPreview(nextPreview)

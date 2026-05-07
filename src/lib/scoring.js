@@ -200,6 +200,10 @@ function getBoardSpecificFeedback(board, mode) {
       return mode === 'essay'
         ? 'Ensure your points specifically address the WJEC assessment objectives for your subject.'
         : 'WJEC math/science marking values clear step-by-step methodology.'
+    case 'CCEA':
+      return mode === 'essay'
+        ? 'CCEA structure: clearly signpost your assessment objectives (AO1/AO2/AO3) within your answer.'
+        : 'CCEA method marks: show your working clearly and ensure your final answer stands out.'
     default:
       return 'Keep your response aligned to the question and show your reasoning clearly.'
   }
@@ -232,6 +236,11 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   const ao1 = []
   const ao2 = []
   const ao3 = []
+  const pushUniqueFeedback = (feedbackList, message) => {
+    if (message && !feedbackList.includes(message)) {
+      feedbackList.push(message)
+    }
+  }
   let score = 0
 
   const hasAdequateLength = length >= 60
@@ -244,14 +253,14 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   if (hasAdequateLength) {
     ao1.push('There is enough detail here to assess the main ideas.')
   } else if (length > 0) {
-    ao1.push('Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
+    pushUniqueFeedback(ao1, 'Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
   }
 
   if (hasEvidenceDetail) {
     ao1.push('You are using specific evidence, examples, or terminology, which strengthens AO1.')
     score += 1
   } else {
-    ao1.push('Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
+    pushUniqueFeedback(ao1, 'Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
   }
 
   if (hasReasoning) {
