@@ -353,6 +353,8 @@ export default function App() {
     setOcrRetryAvailable(false)
     setUploadName('')
     setUploadPreview('')
+    setMarkResult(null)
+    setCopyFeedbackStatus('')
     setOcrStatus('Upload an image and OCR will fill the question box.')
     setOcrLoading(false)
   }, [revokeUploadPreview])
