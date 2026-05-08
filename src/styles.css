@@ -659,3 +659,12 @@ input:focus-visible {
     align-items: start;
   }
 }
+
+/* Fix: suppress hover transforms and filters on disabled buttons */
+.primary:disabled:hover,
+.secondary:disabled:hover,
+button:disabled:hover {
+  transform: none !important;
+  filter: none !important;
+  cursor: not-allowed !important;
+}
