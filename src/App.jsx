@@ -196,6 +196,7 @@ export default function App() {
   const pendingOcrFileRef = useRef(null)
   const uploadPreviewRef = useRef('')
   const markRequestInFlightRef = useRef(false)
+  const submittingSubscriptionRef = useRef(false)
   const scoringContextVersionRef = useRef(0)
   const questionTextAutoFilledRef = useRef(false)
 
@@ -730,7 +731,9 @@ export default function App() {
       const refreshedSubscriptions = hasSubscriptionEmail
         ? await loadSubscriptions(normalizedMarkEmail, { updateRecentSubscriptions: false })
         : []
-      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
+      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) {
+        return
+      }
 
       const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
       if (stripePaymentLinkConfigured && hasSubscriptionEmail && subscriptionLoadFailed) {
@@ -795,13 +798,17 @@ export default function App() {
           },
         ],
       })
-      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
+      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) {
+        return
+      }
 
       setError(null)
       await loadSessions()
     } catch (err) {
       console.error('Marking answer failed:', err)
-      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
+      if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) {
+        return
+      }
 
       window.scrollTo(0, 0)
       const configErrorMessage = getSupabaseConfigErrorMessage(err)
@@ -822,6 +829,9 @@ export default function App() {
   }
 
   async function handleSubscription() {
+    if (submittingSubscriptionRef.current) return
+    submittingSubscriptionRef.current = true
+
     setError(null)
     setSessionsError(null)
     setSubscriptionResult('')
@@ -834,18 +844,21 @@ export default function App() {
       console.error(message, { stripePaymentLink: STRIPE_PAYMENT_LINK })
       setError(message)
       setSubscriptionResult(message)
+      submittingSubscriptionRef.current = false
       return
     }
 
     const email = normalizeEmail(subscriptionEmail)
     if (!email) {
       setSubscriptionResult('Add a subscriber email before opening Stripe checkout.')
+      submittingSubscriptionRef.current = false
       return
     }
 
     const emailValidationError = getEmailValidationError(email)
     if (emailValidationError) {
       setSubscriptionResult(emailValidationError)
+      submittingSubscriptionRef.current = false
       return
     }
 
@@ -875,6 +888,13 @@ export default function App() {
 
     setSubmittingSubscription(true)
     try {
+      const validPlanIds = ['top-band', 'student-pro', 'tutor-plus']
+      if (!validPlanIds.includes(subscriptionPlan)) {
+        setSubscriptionResult('Invalid subscription plan selected.')
+        submittingSubscriptionRef.current = false
+        return
+      }
+
       await supabaseRequest('/rest/v1/subscriptions', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
@@ -889,7 +909,10 @@ export default function App() {
         ],
       })
 
-      if (!mountedRef.current) return
+      if (!mountedRef.current) {
+        submittingSubscriptionRef.current = false
+        return
+      }
 
       if (stripePaymentLinkUrl && stripeWindow && !stripeWindow.closed) {
         try {
@@ -904,7 +927,10 @@ export default function App() {
       }
 
       await loadSubscriptions()
-      if (!mountedRef.current) return
+      if (!mountedRef.current) {
+        submittingSubscriptionRef.current = false
+        return
+      }
 
       setError(null)
       setSubscriptionResult(
@@ -920,7 +946,10 @@ export default function App() {
         stripeWindow.close()
       }
 
-      if (!mountedRef.current) return
+      if (!mountedRef.current) {
+        submittingSubscriptionRef.current = false
+        return
+      }
 
       const configErrorMessage = getSupabaseConfigErrorMessage(err)
       const message = configErrorMessage ?? `Subscription save failed: ${err?.message || String(err)}`
@@ -936,6 +965,7 @@ export default function App() {
       if (mountedRef.current) {
         setSubmittingSubscription(false)
       }
+      submittingSubscriptionRef.current = false
     }
   }
 
