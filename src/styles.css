@@ -238,6 +238,7 @@ h1 {
   gap: 12px;
   margin-bottom: 14px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .panel h2 {
