@@ -76,11 +76,24 @@ function getValidStripePaymentLink(link) {
 function getEmailValidationError(email, allowBlank = false) {
   const value = normalizeEmail(email)
   if (!value) {
-    return allowBlank ? null : 'Add a valid email address.'
+    return allowBlank ? null : 'Add a subscriber email address.'
   }
 
   if (!EMAIL_ADDRESS_REGEX.test(value)) {
-    return 'Add a valid email address.'
+    return 'Add a valid subscriber email address.'
+  }
+
+  return null
+}
+
+function getPaywallEmailError(email) {
+  const value = normalizeEmail(email)
+  if (!value) {
+    return 'Add a subscriber email before marking when Stripe payments are enabled.'
+  }
+
+  if (!EMAIL_ADDRESS_REGEX.test(value)) {
+    return 'Add a valid subscriber email before marking when Stripe payments are enabled.'
   }
 
   return null
@@ -167,7 +180,6 @@ export default function App() {
   const [sessionsError, setSessionsError] = useState(null)
   const [subscriptionsError, setSubscriptionsError] = useState(null)
   const [ocrRetryAvailable, setOcrRetryAvailable] = useState(false)
-  const [isOcrRetrying, setIsOcrRetrying] = useState(false)
 
   const uploadRequestIdRef = useRef(0)
   const sessionsRequestIdRef = useRef(0)
@@ -396,7 +408,7 @@ export default function App() {
     const email = normalizedSubscriptionEmail
 
     if (!email) {
-      setSubscriptionResult('Add a subscriber email to check subscription status.')
+      setSubscriptionResult('Add a subscriber email to check Supabase subscription status.')
       return
     }
 
@@ -651,21 +663,9 @@ export default function App() {
     }
 
     setError(null)
-    setIsOcrRetrying(true)
     setOcrRetryAvailable(false)
     setOcrStatus('Retrying OCR...')
-
-    try {
-      await handleFileChange(file)
-    } catch (err) {
-      console.error('OCR retry failed:', err)
-      const errorMessage = `OCR retry failed: ${err?.message || String(err)}`
-      setError(errorMessage)
-      setOcrRetryAvailable(true)
-      setOcrStatus(errorMessage)
-    } finally {
-      setIsOcrRetrying(false)
-    }
+    await handleFileChange(file)
   }
 
   async function handleMark() {
@@ -682,12 +682,19 @@ export default function App() {
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
-    const stripeGateAllowsMarking = hasSubscriptionEmail || !stripePaymentLinkConfigured
-    const emailValidationError = hasSubscriptionEmail ? getEmailValidationError(normalizedMarkEmail, true) : null
+    const paywallEmailError = stripePaymentLinkConfigured ? getPaywallEmailError(normalizedMarkEmail) : null
+    const emailValidationError = hasSubscriptionEmail ? getEmailValidationError(normalizedMarkEmail) : null
 
     if (stripePaymentLinkInvalid && !hasSubscriptionEmail) {
       window.scrollTo(0, 0)
       setError('Stripe payments are enabled, but VITE_STRIPE_PAYMENT_LINK is invalid. Fix the payment link before marking.')
+      return
+    }
+
+    if (paywallEmailError) {
+      window.scrollTo(0, 0)
+      setError(paywallEmailError)
+      setSubscriptionResult(paywallEmailError)
       return
     }
 
@@ -706,12 +713,6 @@ export default function App() {
     if (!trimmedAnswer) {
       window.scrollTo(0, 0)
       setError('Add a student answer, essay, or working before marking.')
-      return
-    }
-
-    if (!stripeGateAllowsMarking) {
-      window.scrollTo(0, 0)
-      setError('Add a subscriber email before marking when Stripe payments are enabled.')
       return
     }
 
@@ -836,13 +837,18 @@ export default function App() {
       return
     }
 
-    const emailValidationError = getEmailValidationError(subscriptionEmail)
+    const email = normalizeEmail(subscriptionEmail)
+    if (!email) {
+      setSubscriptionResult('Add a subscriber email before opening Stripe checkout.')
+      return
+    }
+
+    const emailValidationError = getEmailValidationError(email)
     if (emailValidationError) {
       setSubscriptionResult(emailValidationError)
       return
     }
 
-    const email = normalizeEmail(subscriptionEmail)
     const hasStripeCheckout = Boolean(stripePaymentLinkUrl)
     let stripeWindow = null
     let stripeCheckoutIssue = ''
@@ -1085,7 +1091,6 @@ export default function App() {
                     type="button"
                     className="secondary"
                     onClick={() => void handleOcrRetry()}
-                    disabled={ocrLoading || isOcrRetrying}
                   >
                     Retry OCR
                   </button>
