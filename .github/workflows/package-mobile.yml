@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
       - run: npm install
       - run: npm run build
       # Removed `npm run cap:sync` because this repo does not include committed native folders
