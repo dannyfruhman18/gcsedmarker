@@ -33,40 +33,23 @@ async function extractQuestionTextFromImage(file, onProgress, worker) {
     onProgress('Preparing OCR...')
   }
 
-  let timeoutId
-  try {
-    const recognitionPromise = worker.recognize(file)
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error(OCR_RECOGNITION_TIMEOUT_ERROR))
-      }, OCR_RECOGNITION_TIMEOUT_MS)
-    })
+  const result = await worker.recognize(file)
+  const extractedText = result?.data?.text?.trim() ?? ''
 
-    const result = await Promise.race([recognitionPromise, timeoutPromise])
-    const extractedText = result?.data?.text?.trim() ?? ''
-
-    if (typeof onProgress === 'function') {
-      onProgress(
-        extractedText
-          ? 'OCR complete.'
-          : 'No clear text found. You can type or paste the question manually.',
-      )
-    }
-
-    return extractedText
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-    }
+  if (typeof onProgress === 'function') {
+    onProgress(
+      extractedText
+        ? 'OCR complete.'
+        : 'No clear text found. You can type or paste the question manually.',
+    )
   }
+
+  return extractedText
 }
 
 const OCR_WORKER_INIT_TIMEOUT_MS = 30_000
 const OCR_WORKER_INIT_TIMEOUT_ERROR =
   `OCR worker initialization timed out after ${OCR_WORKER_INIT_TIMEOUT_MS / 1000} seconds. Please try again or reload the page.`
-const OCR_RECOGNITION_TIMEOUT_MS = 60_000
-const OCR_RECOGNITION_TIMEOUT_ERROR =
-  `OCR recognition timed out after ${OCR_RECOGNITION_TIMEOUT_MS / 1000} seconds. Please try again with a smaller or clearer image.`
 
 function getSupabaseConfigErrorMessage(error) {
   const message = error?.message || String(error)
@@ -93,11 +76,24 @@ function getValidStripePaymentLink(link) {
 function getEmailValidationError(email, allowBlank = false) {
   const value = normalizeEmail(email)
   if (!value) {
-    return allowBlank ? null : 'Add a valid email address.'
+    return allowBlank ? null : 'Add a subscriber email address.'
   }
 
   if (!EMAIL_ADDRESS_REGEX.test(value)) {
-    return 'Add a valid email address.'
+    return 'Add a valid subscriber email address.'
+  }
+
+  return null
+}
+
+function getPaywallEmailError(email) {
+  const value = normalizeEmail(email)
+  if (!value) {
+    return 'Add a subscriber email before marking when Stripe payments are enabled.'
+  }
+
+  if (!EMAIL_ADDRESS_REGEX.test(value)) {
+    return 'Add a valid subscriber email before marking when Stripe payments are enabled.'
   }
 
   return null
@@ -184,7 +180,6 @@ export default function App() {
   const [sessionsError, setSessionsError] = useState(null)
   const [subscriptionsError, setSubscriptionsError] = useState(null)
   const [ocrRetryAvailable, setOcrRetryAvailable] = useState(false)
-  const [isOcrRetrying, setIsOcrRetrying] = useState(false)
 
   const uploadRequestIdRef = useRef(0)
   const sessionsRequestIdRef = useRef(0)
@@ -204,8 +199,7 @@ export default function App() {
   const scoringContextVersionRef = useRef(0)
   const questionTextAutoFilledRef = useRef(false)
 
-  const selectedBoard = useMemo(() => (boardOptions.includes(board) ? board : 'AQA'), [board])
-  const boardLink = useMemo(() => BOARD_LINKS[selectedBoard] ?? BOARD_LINKS.AQA, [selectedBoard])
+  const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
   const normalizedSubscriptionEmail = useMemo(
     () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
@@ -414,7 +408,7 @@ export default function App() {
     const email = normalizedSubscriptionEmail
 
     if (!email) {
-      setSubscriptionResult('Add a subscriber email to check subscription status.')
+      setSubscriptionResult('Add a subscriber email to check Supabase subscription status.')
       return
     }
 
@@ -645,22 +639,10 @@ export default function App() {
       console.error('OCR failed while reading uploaded question:', err)
       const errorMessage = err?.message || String(err)
       const sanitizedErrorMessage = errorMessage.endsWith('.') ? errorMessage.slice(0, -1) : errorMessage
-      const hadOcrWorker = Boolean(workerRef.current)
-      const timeoutOccurred = errorMessage === OCR_RECOGNITION_TIMEOUT_ERROR
-
-      if (timeoutOccurred && workerRef.current) {
-        const timedOutWorker = workerRef.current
-        workerRef.current = null
-        workerInitPromiseRef.current = null
-        void timedOutWorker.terminate().catch(() => {})
-      }
-
-      const initFailure = !hadOcrWorker && !timeoutOccurred
-      const ocrErrorMessage = timeoutOccurred
-        ? `OCR could not finish: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
-        : initFailure
-          ? `OCR could not start: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
-          : `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under ${Math.round(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024))}MB.`
+      const initFailure = !workerRef.current
+      const ocrErrorMessage = initFailure
+        ? `OCR could not start: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
+        : `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under ${Math.round(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024))}MB.`
       setOcrRetryAvailable(true)
       setError(ocrErrorMessage)
       setOcrStatus(ocrErrorMessage)
@@ -681,21 +663,9 @@ export default function App() {
     }
 
     setError(null)
-    setIsOcrRetrying(true)
     setOcrRetryAvailable(false)
     setOcrStatus('Retrying OCR...')
-
-    try {
-      await handleFileChange(file)
-    } catch (err) {
-      console.error('OCR retry failed:', err)
-      const errorMessage = `OCR retry failed: ${err?.message || String(err)}`
-      setError(errorMessage)
-      setOcrRetryAvailable(true)
-      setOcrStatus(errorMessage)
-    } finally {
-      setIsOcrRetrying(false)
-    }
+    await handleFileChange(file)
   }
 
   async function handleMark() {
@@ -712,12 +682,19 @@ export default function App() {
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
-    const stripeGateAllowsMarking = hasSubscriptionEmail || !stripePaymentLinkConfigured
-    const emailValidationError = hasSubscriptionEmail ? getEmailValidationError(normalizedMarkEmail, true) : null
+    const paywallEmailError = stripePaymentLinkConfigured ? getPaywallEmailError(normalizedMarkEmail) : null
+    const emailValidationError = hasSubscriptionEmail ? getEmailValidationError(normalizedMarkEmail) : null
 
     if (stripePaymentLinkInvalid && !hasSubscriptionEmail) {
       window.scrollTo(0, 0)
       setError('Stripe payments are enabled, but VITE_STRIPE_PAYMENT_LINK is invalid. Fix the payment link before marking.')
+      return
+    }
+
+    if (paywallEmailError) {
+      window.scrollTo(0, 0)
+      setError(paywallEmailError)
+      setSubscriptionResult(paywallEmailError)
       return
     }
 
@@ -736,12 +713,6 @@ export default function App() {
     if (!trimmedAnswer) {
       window.scrollTo(0, 0)
       setError('Add a student answer, essay, or working before marking.')
-      return
-    }
-
-    if (!stripeGateAllowsMarking) {
-      window.scrollTo(0, 0)
-      setError('Add a subscriber email before marking when Stripe payments are enabled.')
       return
     }
 
@@ -804,7 +775,7 @@ export default function App() {
         questionText: trimmedQuestion,
         answerText: trimmedAnswer,
         topBand,
-        board: selectedBoard,
+        board,
       })
       if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
       setMarkResult(result)
@@ -814,7 +785,7 @@ export default function App() {
         headers: { Prefer: 'return=representation' },
         body: [
           {
-            exam_board: selectedBoard,
+            exam_board: board,
             mode,
             question_text: trimmedQuestion,
             answer_text: trimmedAnswer,
@@ -866,13 +837,18 @@ export default function App() {
       return
     }
 
-    const emailValidationError = getEmailValidationError(subscriptionEmail)
+    const email = normalizeEmail(subscriptionEmail)
+    if (!email) {
+      setSubscriptionResult('Add a subscriber email before opening Stripe checkout.')
+      return
+    }
+
+    const emailValidationError = getEmailValidationError(email)
     if (emailValidationError) {
       setSubscriptionResult(emailValidationError)
       return
     }
 
-    const email = normalizeEmail(subscriptionEmail)
     const hasStripeCheckout = Boolean(stripePaymentLinkUrl)
     let stripeWindow = null
     let stripeCheckoutIssue = ''
@@ -1011,7 +987,7 @@ export default function App() {
         </div>
         <div className="hero-card">
           <div className="stat-row">
-            <div className="stat"><span>Exam board</span><strong>{selectedBoard}</strong></div>
+            <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
             <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
             <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
             <div className="stat"><span>Paywall</span><strong>{stripePaymentLinkConfigured ? (hasStripePaymentLink ? 'Enabled' : 'Misconfigured') : 'Demo'}</strong></div>
@@ -1115,7 +1091,6 @@ export default function App() {
                     type="button"
                     className="secondary"
                     onClick={() => void handleOcrRetry()}
-                    disabled={ocrLoading || isOcrRetrying}
                   >
                     Retry OCR
                   </button>
@@ -1125,6 +1100,7 @@ export default function App() {
                     type="button"
                     className="clear-button"
                     onClick={clearUpload}
+                    disabled={ocrLoading}
                   >
                     Clear
                   </button>
@@ -1251,21 +1227,8 @@ export default function App() {
               </select>
             </label>
             <p className="muted">{subscriptionPlans.find((plan) => plan.id === subscriptionPlan)?.access}</p>
-            <button
-              className="primary"
-              onClick={handleSubscription}
-              disabled={submittingSubscription || supabaseConfigError}
-              title={
-                supabaseConfigError
-                  ? 'Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable subscription checkout.'
-                  : undefined
-              }
-            >
-              {supabaseConfigError
-                ? 'Configure Supabase first'
-                : submittingSubscription
-                  ? 'Processing...'
-                  : STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'Open Stripe checkout' : 'Checkout config invalid') : 'Create subscription record'}
+            <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
+              {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'Open Stripe checkout' : 'Checkout config invalid') : 'Create subscription record'}
             </button>
             <button className="secondary" onClick={() => void refreshSubscriptionStatus()} disabled={refreshingSubscriptionStatus || Boolean(supabaseConfigMessage)}>
               {refreshingSubscriptionStatus ? 'Refreshing...' : 'Refresh Status'}

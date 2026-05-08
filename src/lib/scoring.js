@@ -254,7 +254,7 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   }
 
   const length = essayLength
-  const paragraphBreaks = (text.match(/\n\s*/g) ?? []).length
+  const paragraphBreaks = (text.match(/\n\s*\n/g) ?? []).length
   const ao1 = []
   const ao2 = []
   const ao3 = []
@@ -349,9 +349,7 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   }
 
   if (hasSustainedDevelopment) {
-    if (topBand) {
-      score += 1
-    }
+    score += 1
     ao3.push('Sustained development across the response may support top-band performance.')
     if (topBand) {
       ao3.push('Top Band mode: consider adding a sharp final judgement, embedding precise terminology, and making every paragraph move the argument forward.')
@@ -417,12 +415,12 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
 
   let score = 0
   const hasVisibleCalculation = /(?:\b(?:\d+(?:\.\d+)?[a-z]?|[a-z])\s*=\s*(?:\d+(?:\.\d+)?[a-z]?|[a-z])\b|\b[a-z0-9]+(?:\s*[+\-×÷^\/]\s*[a-z0-9]+)+\b|=>|→)/i.test(text)
-  const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show\s+(?:your\s+work|the\s+working|working(?:\s+out)?)|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate|ans|units)\b|→|=>/i.test(text)
-  const hasWorkingTrail = (lines.length >= 2 && (hasVisibleCalculation || hasProcessLanguage)) || (lines.length === 1 && (hasVisibleCalculation || hasProcessLanguage))
+  const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show\s+(?:your\s+work|the\s+working|working(?:\s+out)?)|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate|units)\b|→|=>/i.test(text)
+  const hasWorkingTrail = hasVisibleCalculation || hasProcessLanguage
   const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage
   const hasFormulaReference = /\b(formula|equation|substitut(e|ion)|calculation|ratio|proportion|graph|table|method)\b/i.test(text)
-  const hasUnits = /\b(cm|mm|kg|g|mol|dm\^?3|°c|units|ans)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)
-  const hasConclusion = /\b(therefore|consequently|ultimately|hence|which means|final answer|in conclusion|ans)\b/i.test(text)
+  const hasUnits = /\b(cm|mm|kg|g|mol|dm\^?3|°c|units)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)
+  const hasConclusion = /\b(therefore|consequently|ultimately|hence|which means|final answer|in conclusion)\b/i.test(text)
   const hasConceptualDetail = /\b(force|energy|mass|velocity|acceleration|reaction|atom|cell|graph|ratio|probability|mean|median|area|volume|gradient|current|voltage|resistance|density|wave|frequency|temperature|power|percentage|speed|distance|time|fraction|equation|function)\b/i.test(text)
   const hasVerification = /\b(check|checked|verify|verified|recheck|sensible|reasonable|plausible|substitut(e|ion)\s+back|back-substitute|sanity check)\b/i.test(text)
   const hasPromptFocus = questionAnalysis.questionKeywords.length
