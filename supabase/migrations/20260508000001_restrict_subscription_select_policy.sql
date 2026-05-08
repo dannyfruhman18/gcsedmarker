@@ -7,4 +7,4 @@ create policy public_select_subscriptions
   on public.subscriptions
   for select
   to anon, authenticated
-  using (status in ('active', 'trialing'));
+  using (status in ('active', 'trialing', 'pending_payment'));
