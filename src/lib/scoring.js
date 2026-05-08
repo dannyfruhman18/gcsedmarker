@@ -84,6 +84,108 @@ const QUESTION_STOPWORDS = new Set([
   'tell',
 ])
 
+// Keep extraction focused on meaningful subject terms, variables, and numbers.
+const GENERIC_STOPWORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'been',
+  'being',
+  'but',
+  'by',
+  'can',
+  'could',
+  'did',
+  'do',
+  'does',
+  'done',
+  'for',
+  'from',
+  'had',
+  'has',
+  'have',
+  'he',
+  'her',
+  'hers',
+  'him',
+  'his',
+  'i',
+  'if',
+  'in',
+  'into',
+  'is',
+  'it',
+  'its',
+  'just',
+  'me',
+  'may',
+  'might',
+  'more',
+  'most',
+  'must',
+  'my',
+  'no',
+  'not',
+  'of',
+  'off',
+  'on',
+  'or',
+  'our',
+  'ours',
+  'out',
+  'over',
+  'shall',
+  'she',
+  'should',
+  'so',
+  'some',
+  'such',
+  'than',
+  'that',
+  'the',
+  'their',
+  'them',
+  'then',
+  'there',
+  'these',
+  'they',
+  'this',
+  'those',
+  'to',
+  'too',
+  'up',
+  'us',
+  'very',
+  'was',
+  'we',
+  'were',
+  'what',
+  'when',
+  'where',
+  'which',
+  'who',
+  'whom',
+  'why',
+  'will',
+  'with',
+  'without',
+  'would',
+  'you',
+  'your',
+  'yours',
+  's',
+  't',
+  'd',
+  'm',
+  're',
+  've',
+  'll',
+])
+
 const PROMPT_FAMILIES = [
   {
     id: 'explain',
@@ -148,8 +250,13 @@ function normaliseText(value) {
 }
 
 function extractKeywords(text) {
-  const words = normaliseText(text).toLowerCase().match(/\b(?:[a-z0-9]{2,})\b/g) ?? []
-  return words.filter((word) => !QUESTION_STOPWORDS.has(word) && !/^\d+$/.test(word))
+  const words =
+    normaliseText(text)
+      .toLowerCase()
+      .replace(/[’']/g, '')
+      .match(/\b(?:[a-z0-9]+(?:-[a-z0-9]+)*)\b/g) ?? []
+
+  return words.filter((word) => !QUESTION_STOPWORDS.has(word) && !GENERIC_STOPWORDS.has(word))
 }
 
 function detectPromptFamily(questionText) {
@@ -417,7 +524,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   const hasProcessLanguage = /\b(?:substitut(?:e|ion)|calculate|show\s+(?:your\s+work|the\s+working|working(?:\s+out)?)|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate|units)\b|→|=>/i.test(text)
   const hasWorkingTrail = hasVisibleCalculation && hasProcessLanguage
   const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage
-  const hasFormulaReference = /\b(formula|equation|substitut(?:e|ion)|calculation|ratio|proportion|graph|table|method)\b/i.test(text)
+  const hasFormulaReference = /\b(formula|equation|substitut(?:e|ion)|calculation|ratio|proportion|graph|table|method)/i.test(text)
   const hasUnits = /\b(?:cm|mm|kg|g|mol|dm\^?3|°c|units)\b|(?:\d+\s*(?:m|s|n|j|w)\b)/i.test(text)
   const hasConclusion = /\b(?:therefore|consequently|ultimately|hence|which means|final answer|in conclusion)\b/i.test(text)
   const hasConceptualDetail = /\b(force|energy|mass|velocity|acceleration|reaction|atom|cell|graph|ratio|probability|mean|median|area|volume|gradient|current|voltage|resistance|density|wave|frequency|temperature|power|percentage|speed|distance|time|fraction|equation|function)\b/i.test(text)
@@ -519,9 +626,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
     ao3: ['If this is a science question, including the key scientific idea, correct units, and any required conclusion can strengthen the response.'],
     summary: topBand
       ? 'Top Band mode: maximise the working trail and annotate every step.'
-      : questionAnalysis.questionKeywords.length
-        ? 'Method-mark feedback uses heuristic checks for visible working and correct process, so a human marker would still need to confirm any award.'
-        : 'Method-mark feedback uses heuristic checks for visible working and correct process, so a human marker would still need to confirm any award.',
+      : 'Method-mark feedback uses heuristic checks for visible working and correct process; a human marker would still need to confirm any award.',
     extra: methodMarks,
   }
 }
