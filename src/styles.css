@@ -120,7 +120,7 @@ button:disabled {
   gap: 14px;
   align-items: center;
 }
-.brand-logo { width: 4rem; height: 4rem; flex: 0 0 auto; display: block; opacity: 1; }
+.brand-logo { width: 4rem; height: 4rem; aspect-ratio: 1 / 1; flex: 0 0 auto; display: block; opacity: 1; }
 .eyebrow {
   margin: 0;
   text-transform: uppercase;

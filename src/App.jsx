@@ -133,12 +133,16 @@ export default function App() {
     if (!workerInitPromiseRef.current) {
       workerInitPromiseRef.current = (() => {
         let timeoutId
-        const initPromise = createWorker('eng', 1, {
+        const initPromise = createWorker({
           logger: (message) => {
             if (typeof ocrProgressHandlerRef.current === 'function') {
               ocrProgressHandlerRef.current(message)
             }
           },
+        }).then(async (worker) => {
+          await worker.loadLanguage('eng')
+          await worker.initialize('eng')
+          return worker
         })
 
         const timeoutPromise = new Promise((_, reject) => {

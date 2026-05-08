@@ -1,6 +1,6 @@
 import React from 'react'
 
-const proofCapabilitiesVideoUrl = new URL('../../proof-capabilities.mp4', import.meta.url).href
+const proofCapabilitiesVideoUrl = '/proof.mp4'
 
 export default function ProofVideoSection() {
   return (
