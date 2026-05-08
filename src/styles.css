@@ -355,18 +355,19 @@ textarea {
 }
 
 .ocr-status-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: stretch;
+  justify-content: stretch;
+  width: 100%;
   min-width: 0;
 }
 
 .ocr-status-actions > button {
   margin-top: 0;
-  flex: 1 1 auto;
-  min-width: 100px;
+  width: 100%;
+  min-width: 0;
 }
 
 .preview-container {
@@ -738,23 +739,13 @@ textarea {
   }
 
   .ocr-status-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .ocr-status-actions > button {
-    flex: 1 1 auto;
-    width: auto;
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
   .stat-row {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .ocr-status-actions > button {
-    flex-basis: 100%;
   }
 }
 
