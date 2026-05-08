@@ -116,6 +116,7 @@ export default function App() {
   const [subscriptionResult, setSubscriptionResult] = useState('')
   const [showStripeFallback, setShowStripeFallback] = useState(false)
   const [submittingSubscription, setSubmittingSubscription] = useState(false)
+  const [refreshingSubscriptionStatus, setRefreshingSubscriptionStatus] = useState(false)
   const [error, setError] = useState(null)
   const [sessionsError, setSessionsError] = useState(null)
   const [subscriptionsError, setSubscriptionsError] = useState(null)
@@ -355,16 +356,23 @@ export default function App() {
       return
     }
 
-    const rows = await loadSubscriptions(email, { updateRecentSubscriptions: false })
-    if (rows === null) {
-      setSubscriptionResult('Failed to refresh status.')
-    } else {
-      const hasActiveSubscription = subscriptionHasActiveAccess(rows, email)
-      setSubscriptionResult(
-        hasActiveSubscription
-          ? 'An active subscription was found for this email.'
-          : 'No active subscription was found for this email.',
-      )
+    setRefreshingSubscriptionStatus(true)
+    try {
+      const rows = await loadSubscriptions(email, { updateRecentSubscriptions: false })
+      if (rows === null) {
+        setSubscriptionResult('Failed to refresh status.')
+      } else {
+        const hasActiveSubscription = subscriptionHasActiveAccess(rows, email)
+        setSubscriptionResult(
+          hasActiveSubscription
+            ? 'An active subscription was found for this email.'
+            : 'No active subscription was found for this email.',
+        )
+      }
+    } finally {
+      if (mountedRef.current) {
+        setRefreshingSubscriptionStatus(false)
+      }
     }
   }, [loadSubscriptions, normalizedSubscriptionEmail])
 
@@ -1007,6 +1015,7 @@ export default function App() {
                   type="button"
                   className="clear-button"
                   onClick={clearUpload}
+                  disabled={ocrLoading}
                 >
                   Clear
                 </button>
@@ -1135,8 +1144,8 @@ export default function App() {
             <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
               {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'Open Stripe checkout' : 'Checkout config invalid') : 'Create subscription record'}
             </button>
-            <button className="secondary" onClick={() => void refreshSubscriptionStatus()}>
-              Refresh Status
+            <button className="secondary" onClick={() => void refreshSubscriptionStatus()} disabled={refreshingSubscriptionStatus}>
+              {refreshingSubscriptionStatus ? 'Refreshing...' : 'Refresh Status'}
             </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
             {showStripeFallback && hasStripePaymentLink && stripePaymentLinkUrl ? (
@@ -1165,7 +1174,9 @@ export default function App() {
           </button>
         </div>
         <div className="history-list">
-          {recentSessions.length ? (
+          {loadingSessions && !recentSessions.length ? (
+            <p className="muted">Loading recent sessions...</p>
+          ) : recentSessions.length ? (
             recentSessions.slice(0, MAX_VISIBLE_HISTORY_ROWS).map((session, index) => (
               <article key={session?.id ?? `session-${index}`} className="history-item">
                 <div>
@@ -1192,7 +1203,9 @@ export default function App() {
           </button>
         </div>
         <div className="history-list">
-          {recentSubscriptions.length ? (
+          {loadingSubscriptions && !recentSubscriptions.length ? (
+            <p className="muted">Loading recent subscriptions...</p>
+          ) : recentSubscriptions.length ? (
             recentSubscriptions.slice(0, MAX_VISIBLE_SUBSCRIPTION_ROWS).map((subscription, index) => (
               <article key={subscription?.id ?? `subscription-${index}`} className="history-item">
                 <div>

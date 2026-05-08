@@ -473,6 +473,7 @@ textarea {
 
 .error {
   color: var(--color-error);
+  overflow-wrap: anywhere;
 }
 
 .resource-box {
