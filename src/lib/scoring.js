@@ -524,7 +524,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   const hasProcessLanguage = /\b(?:substitut(?:e|ion)|calculate|show\s+(?:your\s+work|the\s+working|working(?:\s+out)?)|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate|units)\b|→|=>/i.test(text)
   const hasWorkingTrail = hasVisibleCalculation && hasProcessLanguage
   const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage
-  const hasFormulaReference = /\b(formula|equation|substitut(?:e|ion)|calculation|ratio|proportion|graph|table|method)/i.test(text)
+  const hasFormulaReference = /\b(formula|equation|substitut(?:e|ion)|calculation|ratio|proportion|graph|table|method)\b/i.test(text)
   const hasUnits = /\b(?:cm|mm|kg|g|mol|dm\^?3|°c|units)\b|(?:\d+\s*(?:m|s|n|j|w)\b)/i.test(text)
   const hasConclusion = /\b(?:therefore|consequently|ultimately|hence|which means|final answer|in conclusion)\b/i.test(text)
   const hasConceptualDetail = /\b(force|energy|mass|velocity|acceleration|reaction|atom|cell|graph|ratio|probability|mean|median|area|volume|gradient|current|voltage|resistance|density|wave|frequency|temperature|power|percentage|speed|distance|time|fraction|equation|function)\b/i.test(text)
