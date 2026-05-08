@@ -468,6 +468,9 @@ textarea { resize: vertical; min-height: 110px; }
 
   button:disabled:hover {
     text-decoration: none;
+    transform: none;
+    filter: none;
+    cursor: not-allowed;
   }
 
   .chip-link:hover {
