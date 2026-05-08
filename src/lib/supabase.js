@@ -20,7 +20,7 @@ function getSupabaseRequestConfigError() {
       return `Supabase URL must use http or https: "${SUPABASE_BASE_URL}".`
     }
   } catch {
-    return `Supabase URL is invalid: "${SUPABASE_BASE_URL}". Set VITE_SUPABASE_URL to a full https:// project URL.`
+    return `Supabase URL is invalid: "${SUPABASE_BASE_URL}". Set VITE_SUPABASE_URL to a full https://project URL.`
   }
 
   if (!SUPABASE_ANON_KEY) {

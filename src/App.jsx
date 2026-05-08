@@ -165,6 +165,7 @@ export default function App() {
     [subscriptionEmail],
   )
   const supabaseConfigMessage = SUPABASE_CONFIG_ERROR || ''
+  const supabaseConfigError = Boolean(SUPABASE_CONFIG_ERROR)
   const stripePaymentLinkUrl = useMemo(() => getValidStripePaymentLink(STRIPE_PAYMENT_LINK), [])
   const hasStripePaymentLink = Boolean(stripePaymentLinkUrl)
 
@@ -889,26 +890,11 @@ export default function App() {
     const feedbackText = `Score: ${markResult.score} / ${markResult.maxMarks}\nSummary: ${summary}`
 
     try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(feedbackText)
-      } else {
-        const helper = document.createElement('textarea')
-        helper.value = feedbackText
-        helper.setAttribute('readonly', 'true')
-        helper.style.position = 'fixed'
-        helper.style.top = '-9999px'
-        helper.style.left = '-9999px'
-        helper.style.opacity = '0'
-        document.body.appendChild(helper)
-        helper.focus()
-        helper.select()
-        const copied = document.execCommand('copy')
-        document.body.removeChild(helper)
-        if (!copied) {
-          throw new Error('Clipboard copy was blocked.')
-        }
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error('Clipboard API is unavailable.')
       }
 
+      await navigator.clipboard.writeText(feedbackText)
       setCopyFeedbackStatus('Feedback copied to clipboard.')
     } catch (copyErr) {
       console.error('Could not copy feedback to clipboard:', copyErr)
@@ -1037,27 +1023,31 @@ export default function App() {
               <span>JPG, PNG, or camera image</span>
             </label>
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <p id="ocr-status" className="muted" aria-live="polite" style={{ margin: 0, flex: '1 1 220px' }}>{ocrStatus}</p>
-              {ocrRetryAvailable ? (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => void handleOcrRetry()}
-                >
-                  Retry OCR
-                </button>
-              ) : null}
-              {uploadPreview ? (
-                <button
-                  type="button"
-                  className="clear-button"
-                  onClick={clearUpload}
-                  disabled={ocrLoading}
-                >
-                  Clear
-                </button>
-              ) : null}
+            <div className="ocr-status-row">
+              <p id="ocr-status" className="muted ocr-status-text" aria-live="polite">
+                {ocrStatus}
+              </p>
+              <div className="ocr-status-actions">
+                {ocrRetryAvailable ? (
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => void handleOcrRetry()}
+                  >
+                    Retry OCR
+                  </button>
+                ) : null}
+                {uploadPreview ? (
+                  <button
+                    type="button"
+                    className="clear-button"
+                    onClick={clearUpload}
+                    disabled={ocrLoading}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
             </div>
             <div className="preview-container">
               {uploadPreview ? (
@@ -1095,7 +1085,7 @@ export default function App() {
             </label>
           </div>
 
-          <button className="primary" onClick={handleMark} disabled={marking || ocrLoading}>
+          <button className="primary" onClick={handleMark} disabled={marking || ocrLoading || supabaseConfigError}>
             {marking ? 'Marking...' : 'Mark answer'}
           </button>
         </section>
