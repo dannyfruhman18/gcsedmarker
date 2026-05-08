@@ -148,7 +148,7 @@ function normaliseText(value) {
 }
 
 function extractKeywords(text) {
-  const words = normaliseText(text).toLowerCase().match(/\b(?:[a-z]|[a-z0-9]{2,})\b/g) ?? []
+  const words = normaliseText(text).toLowerCase().match(/\b(?:[a-z0-9]{2,})\b/g) ?? []
   return words.filter((word) => !QUESTION_STOPWORDS.has(word) && !/^\d+$/.test(word))
 }
 
@@ -418,7 +418,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   let score = 0
   const hasVisibleCalculation = /(?:\b(?:\d+(?:\.\d+)?[a-z]?|[a-z])\s*=\s*(?:\d+(?:\.\d+)?[a-z]?|[a-z])\b|\b[a-z0-9]+(?:\s*[+\-×÷^\/]\s*[a-z0-9]+)+\b|=>|→)/i.test(text)
   const hasProcessLanguage = /\b(substitut(e|ion)|calculate|show\s+(?:your\s+work|the\s+working|working(?:\s+out)?)|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate|ans|units)\b|→|=>/i.test(text)
-  const hasWorkingTrail = lines.length >= 2 && (hasVisibleCalculation || hasProcessLanguage)
+  const hasWorkingTrail = (lines.length >= 2 && (hasVisibleCalculation || hasProcessLanguage)) || (lines.length === 1 && (hasVisibleCalculation || hasProcessLanguage))
   const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage
   const hasFormulaReference = /\b(formula|equation|substitut(e|ion)|calculation|ratio|proportion|graph|table|method)\b/i.test(text)
   const hasUnits = /\b(cm|mm|kg|g|mol|dm\^?3|°c|units|ans)\b|(\d+\s*(m|s|n|j|w)\b)/i.test(text)
