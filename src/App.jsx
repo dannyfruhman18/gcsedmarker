@@ -918,7 +918,7 @@ export default function App() {
             </label>
             <label className="toggle">
               <input type="checkbox" checked={topBand} onChange={(e) => setTopBand(e.target.checked)} />
-              Top Band mode
+              Top Band mode <span className="muted">(best for 120+ words)</span>
             </label>
           </div>
 
