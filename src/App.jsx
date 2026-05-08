@@ -21,6 +21,10 @@ import {
   supabaseRequest,
 } from './lib/supabase'
 
+const OCR_RECOGNITION_TIMEOUT_MS = 60_000
+const OCR_RECOGNITION_TIMEOUT_ERROR =
+  `OCR recognition timed out after ${OCR_RECOGNITION_TIMEOUT_MS / 1000} seconds. Please try a clearer image or try again.`
+
 async function extractQuestionTextFromImage(file, onProgress, worker) {
   if (!worker) {
     throw new Error('OCR worker is not available.')
@@ -30,18 +34,32 @@ async function extractQuestionTextFromImage(file, onProgress, worker) {
     onProgress('Preparing OCR...')
   }
 
-  const result = await worker.recognize(file)
-  const extractedText = result?.data?.text?.trim() ?? ''
+  let timeoutId
+  const recognitionPromise = worker.recognize(file)
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(OCR_RECOGNITION_TIMEOUT_ERROR))
+    }, OCR_RECOGNITION_TIMEOUT_MS)
+  })
 
-  if (typeof onProgress === 'function') {
-    onProgress(
-      extractedText
-        ? 'OCR complete.'
-        : 'No clear text found. You can type or paste the question manually.',
-    )
+  try {
+    const result = await Promise.race([recognitionPromise, timeoutPromise])
+    const extractedText = result?.data?.text?.trim() ?? ''
+
+    if (typeof onProgress === 'function') {
+      onProgress(
+        extractedText
+          ? 'OCR complete.'
+          : 'No clear text found. You can type or paste the question manually.',
+      )
+    }
+
+    return extractedText
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
   }
-
-  return extractedText
 }
 
 export default function App() {
@@ -414,7 +432,10 @@ export default function App() {
       if (!mountedRef.current || !isLatestUpload()) return
 
       console.error('OCR failed while reading uploaded question:', err)
-      if (workerRef.current) {
+      const errorMessage = err?.message || String(err)
+      if (errorMessage === OCR_RECOGNITION_TIMEOUT_ERROR) {
+        setOcrStatus('OCR timed out after 60 seconds. Please try a clearer image or a smaller file under 5MB.')
+      } else if (workerRef.current) {
         setOcrStatus('OCR failed — please type the question manually. Try a clearer image or a smaller file under 5MB.')
       } else {
         setOcrStatus('OCR could not start. Please try again or reload the page.')
