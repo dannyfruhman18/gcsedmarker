@@ -33,23 +33,40 @@ async function extractQuestionTextFromImage(file, onProgress, worker) {
     onProgress('Preparing OCR...')
   }
 
-  const result = await worker.recognize(file)
-  const extractedText = result?.data?.text?.trim() ?? ''
+  let timeoutId
+  try {
+    const recognitionPromise = worker.recognize(file)
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(OCR_RECOGNITION_TIMEOUT_ERROR))
+      }, OCR_RECOGNITION_TIMEOUT_MS)
+    })
 
-  if (typeof onProgress === 'function') {
-    onProgress(
-      extractedText
-        ? 'OCR complete.'
-        : 'No clear text found. You can type or paste the question manually.',
-    )
+    const result = await Promise.race([recognitionPromise, timeoutPromise])
+    const extractedText = result?.data?.text?.trim() ?? ''
+
+    if (typeof onProgress === 'function') {
+      onProgress(
+        extractedText
+          ? 'OCR complete.'
+          : 'No clear text found. You can type or paste the question manually.',
+      )
+    }
+
+    return extractedText
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
   }
-
-  return extractedText
 }
 
 const OCR_WORKER_INIT_TIMEOUT_MS = 30_000
 const OCR_WORKER_INIT_TIMEOUT_ERROR =
   `OCR worker initialization timed out after ${OCR_WORKER_INIT_TIMEOUT_MS / 1000} seconds. Please try again or reload the page.`
+const OCR_RECOGNITION_TIMEOUT_MS = 60_000
+const OCR_RECOGNITION_TIMEOUT_ERROR =
+  `OCR recognition timed out after ${OCR_RECOGNITION_TIMEOUT_MS / 1000} seconds. Please try again with a smaller or clearer image.`
 
 function getSupabaseConfigErrorMessage(error) {
   const message = error?.message || String(error)
@@ -627,10 +644,22 @@ export default function App() {
       console.error('OCR failed while reading uploaded question:', err)
       const errorMessage = err?.message || String(err)
       const sanitizedErrorMessage = errorMessage.endsWith('.') ? errorMessage.slice(0, -1) : errorMessage
-      const initFailure = !workerRef.current
-      const ocrErrorMessage = initFailure
-        ? `OCR could not start: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
-        : `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under ${Math.round(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024))}MB.`
+      const hadOcrWorker = Boolean(workerRef.current)
+      const timeoutOccurred = errorMessage === OCR_RECOGNITION_TIMEOUT_ERROR
+
+      if (timeoutOccurred && workerRef.current) {
+        const timedOutWorker = workerRef.current
+        workerRef.current = null
+        workerInitPromiseRef.current = null
+        void timedOutWorker.terminate().catch(() => {})
+      }
+
+      const initFailure = !hadOcrWorker && !timeoutOccurred
+      const ocrErrorMessage = timeoutOccurred
+        ? `OCR could not finish: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
+        : initFailure
+          ? `OCR could not start: ${sanitizedErrorMessage}. Tap Retry OCR to try again.`
+          : `OCR failed: ${sanitizedErrorMessage}. Please try a clearer image or a smaller file under ${Math.round(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024))}MB.`
       setOcrRetryAvailable(true)
       setError(ocrErrorMessage)
       setOcrStatus(ocrErrorMessage)
@@ -1095,7 +1124,6 @@ export default function App() {
                     type="button"
                     className="clear-button"
                     onClick={clearUpload}
-                    disabled={ocrLoading}
                   >
                     Clear
                   </button>
