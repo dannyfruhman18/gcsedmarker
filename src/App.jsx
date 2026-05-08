@@ -141,6 +141,7 @@ export default function App() {
   const [subscriptionsError, setSubscriptionsError] = useState(null)
   const [ocrRetryAvailable, setOcrRetryAvailable] = useState(false)
 
+  const uploadInputRef = useRef(null)
   const uploadRequestIdRef = useRef(0)
   const sessionsRequestIdRef = useRef(0)
   const subscriptionsRequestIdRef = useRef(0)
@@ -991,7 +992,7 @@ export default function App() {
 
           <div className={`dropzone ${ocrLoading ? 'loading' : ''}`}>
             <input
-              id="upload"
+              ref={uploadInputRef}
               className="visually-hidden"
               type="file"
               accept="image/*"
@@ -1001,27 +1002,17 @@ export default function App() {
                 e.target.value = ''
               }}
             />
-            <label
-              htmlFor="upload"
+            <button
+              type="button"
               className="upload-button"
-              role="button"
-              tabIndex={ocrLoading ? -1 : 0}
-              aria-disabled={ocrLoading}
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={ocrLoading}
               aria-label="Upload a scan or photo of the question"
               aria-describedby="ocr-status"
-              onKeyDown={(e) => {
-                if (ocrLoading) {
-                  return
-                }
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  document.getElementById('upload')?.click()
-                }
-              }}
             >
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
-            </label>
+            </button>
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
             <div className="ocr-status-row">
               <p id="ocr-status" className="muted ocr-status-text" aria-live="polite">
