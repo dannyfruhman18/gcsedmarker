@@ -46,7 +46,7 @@ class ErrorBoundaryController extends React.Component {
           <p className="error">
             {error?.message || 'An unexpected error occurred while rendering the app.'}
           </p>
-          {error?.stack ? (
+          {error?.stack && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? (
             <pre
               style={{
                 whiteSpace: 'pre-wrap',
