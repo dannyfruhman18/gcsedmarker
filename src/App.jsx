@@ -153,6 +153,10 @@ function getSubscriptionAccessDetails(rows, email) {
   }
 }
 
+function getValidSubscriptionPlanIds() {
+  return subscriptionPlans.map((plan) => plan.id)
+}
+
 export default function App() {
   const [board, setBoard] = useState('AQA')
   const [mode, setMode] = useState('essay')
@@ -830,7 +834,6 @@ export default function App() {
 
   async function handleSubscription() {
     if (submittingSubscriptionRef.current) return
-    submittingSubscriptionRef.current = true
 
     setError(null)
     setSessionsError(null)
@@ -844,21 +847,26 @@ export default function App() {
       console.error(message, { stripePaymentLink: STRIPE_PAYMENT_LINK })
       setError(message)
       setSubscriptionResult(message)
-      submittingSubscriptionRef.current = false
       return
     }
 
     const email = normalizeEmail(subscriptionEmail)
     if (!email) {
       setSubscriptionResult('Add a subscriber email before opening Stripe checkout.')
-      submittingSubscriptionRef.current = false
       return
     }
 
     const emailValidationError = getEmailValidationError(email)
     if (emailValidationError) {
       setSubscriptionResult(emailValidationError)
-      submittingSubscriptionRef.current = false
+      return
+    }
+
+    const validPlanIds = getValidSubscriptionPlanIds()
+    if (!validPlanIds.includes(subscriptionPlan)) {
+      const message = `Invalid subscription plan selected. Valid plans: ${validPlanIds.join(', ')}.`
+      setError(message)
+      setSubscriptionResult(message)
       return
     }
 
@@ -866,33 +874,27 @@ export default function App() {
     let stripeWindow = null
     let stripeCheckoutIssue = ''
 
-    if (hasStripeCheckout) {
-      try {
-        stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
-        if (!stripeWindow || stripeWindow.closed) {
-          stripeCheckoutIssue = 'the popup was blocked by your browser'
-          setShowStripeFallback(true)
-        } else {
-          try {
-            stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
-          } catch (popupWriteErr) {
-            console.error('Stripe checkout popup opened, but writing the placeholder content failed.', popupWriteErr)
-          }
-        }
-      } catch (popupOpenErr) {
-        stripeCheckoutIssue = 'opening the Stripe checkout popup threw an exception'
-        setShowStripeFallback(true)
-        console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
-      }
-    }
-
+    submittingSubscriptionRef.current = true
     setSubmittingSubscription(true)
     try {
-      const validPlanIds = ['top-band', 'student-pro', 'tutor-plus']
-      if (!validPlanIds.includes(subscriptionPlan)) {
-        setSubscriptionResult('Invalid subscription plan selected.')
-        submittingSubscriptionRef.current = false
-        return
+      if (hasStripeCheckout) {
+        try {
+          stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
+          if (!stripeWindow || stripeWindow.closed) {
+            stripeCheckoutIssue = 'the popup was blocked by your browser'
+            setShowStripeFallback(true)
+          } else {
+            try {
+              stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
+            } catch (popupWriteErr) {
+              console.error('Stripe checkout popup opened, but writing the placeholder content failed.', popupWriteErr)
+            }
+          }
+        } catch (popupOpenErr) {
+          stripeCheckoutIssue = 'opening the Stripe checkout popup threw an exception'
+          setShowStripeFallback(true)
+          console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
+        }
       }
 
       await supabaseRequest('/rest/v1/subscriptions', {
@@ -910,7 +912,6 @@ export default function App() {
       })
 
       if (!mountedRef.current) {
-        submittingSubscriptionRef.current = false
         return
       }
 
@@ -928,7 +929,6 @@ export default function App() {
 
       await loadSubscriptions()
       if (!mountedRef.current) {
-        submittingSubscriptionRef.current = false
         return
       }
 
@@ -947,7 +947,6 @@ export default function App() {
       }
 
       if (!mountedRef.current) {
-        submittingSubscriptionRef.current = false
         return
       }
 

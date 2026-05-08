@@ -24,7 +24,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies with verbose logging
-        run: npm install --verbose
+        run: npm ci
 
       - name: Build web app with verbose logging
         run: npm run build -- --debug
