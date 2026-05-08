@@ -47,7 +47,7 @@ async function extractQuestionTextFromImage(file, onProgress, worker) {
 
 const OCR_WORKER_INIT_TIMEOUT_MS = 30_000
 const OCR_WORKER_INIT_TIMEOUT_ERROR =
-  'OCR worker initialization timed out after 30 seconds. Please try again or reload the page.'
+  `OCR worker initialization timed out after ${OCR_WORKER_INIT_TIMEOUT_MS / 1000} seconds. Please try again or reload the page.`
 
 function getSupabaseConfigErrorMessage(error) {
   const message = error?.message || String(error)
@@ -575,6 +575,7 @@ export default function App() {
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
+    const stripeGateAllowsMarking = hasSubscriptionEmail || !hasStripePaymentLink
 
     if (!trimmedQuestion && !trimmedAnswer) {
       window.scrollTo(0, 0)
@@ -594,7 +595,7 @@ export default function App() {
       return
     }
 
-    if (hasStripePaymentLink && !hasSubscriptionEmail) {
+    if (!stripeGateAllowsMarking) {
       window.scrollTo(0, 0)
       setError('Add a subscriber email before marking when Stripe payments are enabled.')
       return
