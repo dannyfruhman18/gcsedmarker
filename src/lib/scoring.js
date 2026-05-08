@@ -123,6 +123,23 @@ const PROMPT_FAMILIES = [
   },
 ]
 
+const PROMPT_FAMILY_FEEDBACK_TERMS = {
+  explain: 'explanation',
+  compare: 'comparison',
+  evaluate: 'evaluation',
+  describe: 'description',
+  analyse: 'analysis',
+  calculate: 'calculation',
+}
+
+function getPromptFamilyFeedbackTerm(promptFamily) {
+  if (!promptFamily) {
+    return ''
+  }
+
+  return PROMPT_FAMILY_FEEDBACK_TERMS[promptFamily.id] ?? promptFamily.label.toLowerCase()
+}
+
 function normaliseText(value) {
   return String(value ?? '').trim()
 }
@@ -177,6 +194,7 @@ function buildQuestionAnalysis(questionText, answerText) {
     missingKeywords,
     commandWord,
     promptFamilyLabel: promptFamily?.label ?? '',
+    promptFamilyFeedbackTerm: getPromptFamilyFeedbackTerm(promptFamily),
     usesCommandStyle,
     keywordCoverage,
   }
@@ -307,11 +325,15 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
     if (questionAnalysis.usesCommandStyle) {
       score += 1
       ao3.push(
-        `The question asks you to ${questionAnalysis.commandWord}, and your response shows that style clearly.`,
+        questionAnalysis.promptFamilyFeedbackTerm
+          ? `The question calls for ${questionAnalysis.promptFamilyFeedbackTerm}, and your response shows that style clearly.`
+          : `The question asks you to ${questionAnalysis.commandWord}, and your response shows that style clearly.`,
       )
     } else {
       ao3.push(
-        `The question asks you to ${questionAnalysis.commandWord}, so add more of the matching style (reasoning, comparison, or evaluation).`,
+        questionAnalysis.promptFamilyFeedbackTerm
+          ? `The question calls for more ${questionAnalysis.promptFamilyFeedbackTerm}, so add more of the matching style (reasoning, comparison, or evaluation).`
+          : `The question asks you to ${questionAnalysis.commandWord}, so add more of the matching style (reasoning, comparison, or evaluation).`,
       )
     }
   }
@@ -324,7 +346,7 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   }
 
   if (hasSustainedDevelopment) {
-    if (topBand && hasSustainedDevelopment) {
+    if (topBand) {
       score += 1
     }
     ao3.push('Sustained development across the response helps to secure the top band.')
@@ -468,9 +490,17 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   if (questionAnalysis.commandWord) {
     if (questionAnalysis.usesCommandStyle) {
       score += 1
-      addMethodMark(`The prompt asks you to ${questionAnalysis.commandWord}, and your response shows that process clearly.`)
+      addMethodMark(
+        questionAnalysis.promptFamilyFeedbackTerm
+          ? `The prompt calls for ${questionAnalysis.promptFamilyFeedbackTerm}, and your response shows that process clearly.`
+          : `The prompt asks you to ${questionAnalysis.commandWord}, and your response shows that process clearly.`,
+      )
     } else {
-      addMethodMark(`The prompt asks you to ${questionAnalysis.commandWord}, so make that method style more obvious in your working.`)
+      addMethodMark(
+        questionAnalysis.promptFamilyFeedbackTerm
+          ? `The prompt calls for more ${questionAnalysis.promptFamilyFeedbackTerm}, so make that method style more obvious in your working.`
+          : `The prompt asks you to ${questionAnalysis.commandWord}, so make that method style more obvious in your working.`,
+      )
     }
   }
 

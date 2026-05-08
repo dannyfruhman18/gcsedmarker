@@ -1144,7 +1144,7 @@ export default function App() {
             <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
               {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'Open Stripe checkout' : 'Checkout config invalid') : 'Create subscription record'}
             </button>
-            <button className="secondary" onClick={() => void refreshSubscriptionStatus()} disabled={refreshingSubscriptionStatus}>
+            <button className="secondary" onClick={() => void refreshSubscriptionStatus()} disabled={refreshingSubscriptionStatus || Boolean(supabaseConfigMessage)}>
               {refreshingSubscriptionStatus ? 'Refreshing...' : 'Refresh Status'}
             </button>
             {subscriptionResult ? <p className="result-note">{subscriptionResult}</p> : null}
@@ -1169,7 +1169,7 @@ export default function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent Supabase saves</h2>
-          <button className="secondary" onClick={loadSessions} disabled={loadingSessions}>
+          <button className="secondary" onClick={loadSessions} disabled={loadingSessions || Boolean(supabaseConfigMessage)}>
             {loadingSessions ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
@@ -1198,7 +1198,7 @@ export default function App() {
       <section className="panel history-panel">
         <div className="panel-header">
           <h2>Recent subscriptions</h2>
-          <button className="secondary" onClick={() => void loadSubscriptions()} disabled={loadingSubscriptions}>
+          <button className="secondary" onClick={() => void loadSubscriptions()} disabled={loadingSubscriptions || Boolean(supabaseConfigMessage)}>
             {loadingSubscriptions ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
