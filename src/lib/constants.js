@@ -1,14 +1,42 @@
 export const APP_NAME = 'GCSEmarker'
 
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const rawSupabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim()
+const rawSupabaseAnonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+const rawStripePaymentLink = String(import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? '').trim()
+
+function getSupabaseUrlValidationError(value) {
+  const trimmedValue = String(value ?? '').trim()
+  if (!trimmedValue) {
+    return null
+  }
+
+  try {
+    const parsedUrl = new URL(trimmedValue)
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return `Supabase URL must use http or https: "${trimmedValue}".`
+    }
+    if (!parsedUrl.hostname) {
+      return `Supabase URL is invalid: "${trimmedValue}". Set VITE_SUPABASE_URL to a full http(s) project URL.`
+    }
+    return null
+  } catch {
+    return `Supabase URL is invalid: "${trimmedValue}". Set VITE_SUPABASE_URL to a full http(s) project URL.`
+  }
+}
+
+export const SUPABASE_URL = rawSupabaseUrl
 export const SUPABASE_BASE_URL = SUPABASE_URL ? SUPABASE_URL.replace(/\/+$/, '') : ''
-export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-export const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? ''
+export const SUPABASE_ANON_KEY = rawSupabaseAnonKey
+export const STRIPE_PAYMENT_LINK = rawStripePaymentLink
+
+const supabaseUrlValidationError = getSupabaseUrlValidationError(SUPABASE_URL)
 
 export const SUPABASE_CONFIG_ERROR =
   !SUPABASE_URL || !SUPABASE_ANON_KEY
     ? 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment, then restart the app to enable loading and saving data.'
-    : null
+    : supabaseUrlValidationError
+      ? supabaseUrlValidationError
+      : null
 
 export const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024

@@ -71,6 +71,28 @@ function getValidStripePaymentLink(link) {
   }
 }
 
+function getEmailValidationError(email, allowBlank = false) {
+  const value = normalizeEmail(email)
+  if (!value) {
+    return allowBlank ? null : 'Add a valid email address.'
+  }
+
+  if (!EMAIL_ADDRESS_REGEX.test(value)) {
+    return 'Add a valid email address.'
+  }
+
+  return null
+}
+
+function getStripeCheckoutFallbackMessage(detail) {
+  const value = String(detail ?? '').trim()
+  if (!value) {
+    return 'Stripe checkout could not be opened. The subscription was saved in Supabase, and you can use the fallback link below to continue payment.'
+  }
+
+  return `Stripe checkout could not be opened because ${value}. The subscription was saved in Supabase, and you can use the fallback link below to continue payment.`
+}
+
 export default function App() {
   const [board, setBoard] = useState('AQA')
   const [mode, setMode] = useState('essay')
@@ -326,6 +348,12 @@ export default function App() {
       return
     }
 
+    const emailValidationError = getEmailValidationError(email)
+    if (emailValidationError) {
+      setSubscriptionResult(emailValidationError)
+      return
+    }
+
     const rows = await loadSubscriptions(email, { updateRecentSubscriptions: false })
     if (rows === null) {
       setSubscriptionResult('Failed to refresh status.')
@@ -576,6 +604,7 @@ export default function App() {
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
     const stripeGateAllowsMarking = hasSubscriptionEmail || !hasStripePaymentLink
+    const emailValidationError = hasSubscriptionEmail ? getEmailValidationError(normalizedMarkEmail, true) : null
 
     if (!trimmedQuestion && !trimmedAnswer) {
       window.scrollTo(0, 0)
@@ -601,9 +630,9 @@ export default function App() {
       return
     }
 
-    if (hasSubscriptionEmail && !EMAIL_ADDRESS_REGEX.test(normalizedMarkEmail)) {
+    if (emailValidationError) {
       window.scrollTo(0, 0)
-      setError('Add a valid email address before marking, or leave it blank for demo mode.')
+      setError(emailValidationError)
       return
     }
 
@@ -707,37 +736,34 @@ export default function App() {
       return
     }
 
-    const email = normalizeEmail(subscriptionEmail)
-    if (!email || !EMAIL_ADDRESS_REGEX.test(email)) {
-      setSubscriptionResult('Add a valid email address.')
+    const emailValidationError = getEmailValidationError(subscriptionEmail)
+    if (emailValidationError) {
+      setSubscriptionResult(emailValidationError)
       return
     }
 
+    const email = normalizeEmail(subscriptionEmail)
     const hasStripeCheckout = Boolean(stripePaymentLinkUrl)
     let stripeWindow = null
-    let stripePopupBlocked = false
-    const popupBlockedMessage =
-      'Stripe checkout popup was blocked by your browser. The subscription was saved in Supabase, and you can use the fallback link below to complete payment.'
+    let stripeCheckoutIssue = ''
 
     if (hasStripeCheckout) {
       try {
         stripeWindow = window.open('about:blank', '_blank', 'noreferrer')
-        stripePopupBlocked = !stripeWindow
-      } catch (popupOpenErr) {
-        stripePopupBlocked = true
-        console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
-      }
-
-      if (stripePopupBlocked) {
-        setShowStripeFallback(true)
-      }
-
-      if (!stripePopupBlocked) {
-        try {
-          stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
-        } catch (popupWriteErr) {
-          console.error('Stripe checkout popup opened, but writing the placeholder content failed.', popupWriteErr)
+        if (!stripeWindow || stripeWindow.closed) {
+          stripeCheckoutIssue = 'the popup was blocked by your browser'
+          setShowStripeFallback(true)
+        } else {
+          try {
+            stripeWindow.document.write('<p style="font-family:sans-serif;padding:16px;">Opening Stripe checkout…</p>')
+          } catch (popupWriteErr) {
+            console.error('Stripe checkout popup opened, but writing the placeholder content failed.', popupWriteErr)
+          }
         }
+      } catch (popupOpenErr) {
+        stripeCheckoutIssue = 'opening the Stripe checkout popup threw an exception'
+        setShowStripeFallback(true)
+        console.error('Opening the Stripe checkout popup threw an exception.', popupOpenErr)
       }
     }
 
@@ -764,6 +790,10 @@ export default function App() {
           stripeWindow.location.href = stripePaymentLinkUrl.href
         } catch (popupRedirectErr) {
           console.error('Stripe checkout popup opened, but redirecting to the payment link failed.', popupRedirectErr)
+          if (!stripeCheckoutIssue) {
+            stripeCheckoutIssue = 'the browser blocked redirecting the checkout popup to Stripe'
+          }
+          setShowStripeFallback(true)
         }
       }
 
@@ -773,8 +803,8 @@ export default function App() {
       setError(null)
       setSubscriptionResult(
         hasStripeCheckout
-          ? stripePopupBlocked
-            ? popupBlockedMessage
+          ? stripeCheckoutIssue
+            ? getStripeCheckoutFallbackMessage(stripeCheckoutIssue)
             : 'Subscription record saved in Supabase and Stripe checkout opened in a new tab.'
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.',
       )
@@ -791,7 +821,7 @@ export default function App() {
       setError(message)
       setSubscriptionResult(
         hasStripeCheckout
-          ? stripePopupBlocked
+          ? stripeCheckoutIssue
             ? `${message} The checkout popup was blocked, so use the fallback link below to continue payment.`
             : message
           : message,
