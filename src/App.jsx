@@ -20,6 +20,8 @@ import {
   maskEmail,
   normalizeEmail,
   supabaseRequest,
+  subscriptionHasActiveAccess,
+  subscriptionHasPendingAccess,
 } from './lib/supabase'
 
 async function extractQuestionTextFromImage(file, onProgress, worker) {
@@ -93,7 +95,35 @@ function getStripeCheckoutFallbackMessage(detail) {
   return `Stripe checkout could not be opened because ${value}. The subscription was saved in Supabase, and you can use the fallback link below to continue payment.`
 }
 
-const PENDING_PAYMENT_ACCESS_NOTE = 'Demo access is enabled while Stripe is not fully integrated.'
+const ACTIVE_SUBSCRIPTION_LABEL = 'Active (paid)'
+const ACTIVE_TRIALING_SUBSCRIPTION_LABEL = 'Active (trialing)'
+const PENDING_SUBSCRIPTION_LABEL = 'Pending (billing in progress)'
+
+function getSubscriptionStatusLabel(status) {
+  const normalizedStatus = String(status ?? '').trim().toLowerCase()
+  if (!normalizedStatus) {
+    return 'Unknown status'
+  }
+
+  if (normalizedStatus === 'active') {
+    return ACTIVE_SUBSCRIPTION_LABEL
+  }
+
+  if (normalizedStatus === 'trialing') {
+    return ACTIVE_TRIALING_SUBSCRIPTION_LABEL
+  }
+
+  if (normalizedStatus === 'pending_payment') {
+    return PENDING_SUBSCRIPTION_LABEL
+  }
+
+  return normalizedStatus
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+const PENDING_PAYMENT_ACCESS_NOTE = 'Billing is in progress, so access remains available while the payment settles.'
 
 function getSubscriptionAccessDetails(rows, email) {
   const normalizedEmail = normalizeEmail(email)
@@ -104,12 +134,9 @@ function getSubscriptionAccessDetails(rows, email) {
     }
   }
 
-  const matchingRows = rows.filter((row) => normalizeEmail(row?.email) === normalizedEmail)
-  const statuses = matchingRows.map((row) => String(row?.status ?? '').trim().toLowerCase())
-
   return {
-    hasActiveSubscription: statuses.some((status) => status === 'active' || status === 'trialing'),
-    hasPendingPayment: statuses.some((status) => status === 'pending_payment'),
+    hasActiveSubscription: subscriptionHasActiveAccess(rows, normalizedEmail),
+    hasPendingPayment: subscriptionHasPendingAccess(rows, normalizedEmail),
   }
 }
 
@@ -141,7 +168,6 @@ export default function App() {
   const [subscriptionsError, setSubscriptionsError] = useState(null)
   const [ocrRetryAvailable, setOcrRetryAvailable] = useState(false)
 
-  const uploadInputRef = useRef(null)
   const uploadRequestIdRef = useRef(0)
   const sessionsRequestIdRef = useRef(0)
   const subscriptionsRequestIdRef = useRef(0)
@@ -168,6 +194,8 @@ export default function App() {
   const supabaseConfigMessage = SUPABASE_CONFIG_ERROR || ''
   const supabaseConfigError = Boolean(SUPABASE_CONFIG_ERROR)
   const stripePaymentLinkUrl = useMemo(() => getValidStripePaymentLink(STRIPE_PAYMENT_LINK), [])
+  const stripePaymentLinkConfigured = Boolean(STRIPE_PAYMENT_LINK)
+  const stripePaymentLinkInvalid = stripePaymentLinkConfigured && !stripePaymentLinkUrl
   const hasStripePaymentLink = Boolean(stripePaymentLinkUrl)
 
   const ensureOcrWorker = useCallback(async () => {
@@ -385,13 +413,13 @@ export default function App() {
       } else {
         const subscriptionAccessDetails = getSubscriptionAccessDetails(rows, email)
         if (subscriptionAccessDetails.hasActiveSubscription) {
-          setSubscriptionResult('An active subscription was found for this email.')
+          setSubscriptionResult('An active (paid) subscription was found for this email.')
         } else if (subscriptionAccessDetails.hasPendingPayment) {
           setSubscriptionResult(
-            `A pending Stripe payment was found for this email. ${PENDING_PAYMENT_ACCESS_NOTE}`,
+            `A pending (billing in progress) Stripe payment was found for this email. ${PENDING_PAYMENT_ACCESS_NOTE}`,
           )
         } else {
-          setSubscriptionResult('No active subscription was found for this email.')
+          setSubscriptionResult('No active (paid) subscription was found for this email.')
         }
       }
     } finally {
@@ -641,8 +669,14 @@ export default function App() {
     const trimmedAnswer = answerText.trim()
     const normalizedMarkEmail = normalizeEmail(subscriptionEmail)
     const hasSubscriptionEmail = Boolean(normalizedMarkEmail)
-    const stripeGateAllowsMarking = hasSubscriptionEmail || !hasStripePaymentLink
+    const stripeGateAllowsMarking = hasSubscriptionEmail || !stripePaymentLinkConfigured
     const emailValidationError = hasSubscriptionEmail ? getEmailValidationError(normalizedMarkEmail, true) : null
+
+    if (stripePaymentLinkInvalid && !hasSubscriptionEmail) {
+      window.scrollTo(0, 0)
+      setError('Stripe payments are enabled, but VITE_STRIPE_PAYMENT_LINK is invalid. Fix the payment link before marking.')
+      return
+    }
 
     if (!trimmedQuestion && !trimmedAnswer) {
       window.scrollTo(0, 0)
@@ -685,8 +719,10 @@ export default function App() {
       if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
 
       const subscriptionLoadFailed = hasSubscriptionEmail && refreshedSubscriptions === null
-      if (hasStripePaymentLink && hasSubscriptionEmail && subscriptionLoadFailed) {
-        const message = 'Subscription status could not be verified. Please refresh status and try again.'
+      if (stripePaymentLinkConfigured && hasSubscriptionEmail && subscriptionLoadFailed) {
+        const message = stripePaymentLinkInvalid
+          ? 'Stripe payments are enabled, but the payment link is invalid. Fix VITE_STRIPE_PAYMENT_LINK and try again.'
+          : 'Subscription status could not be verified. Please refresh status and try again.'
         if (mountedRef.current && scoringContextVersionRef.current === scoringContextVersionAtStart) {
           window.scrollTo(0, 0)
           setError(message)
@@ -705,9 +741,11 @@ export default function App() {
         subscriptionAccessDetails.hasPendingPayment &&
         !subscriptionAccessDetails.hasActiveSubscription
 
-      if (hasStripePaymentLink && hasSubscriptionEmail && !hasActiveSubscription) {
+      if (stripePaymentLinkConfigured && hasSubscriptionEmail && !hasActiveSubscription) {
         if (mountedRef.current && scoringContextVersionRef.current === scoringContextVersionAtStart) {
-          const subscriptionRequiredMessage = 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active record before marking.'
+          const subscriptionRequiredMessage = stripePaymentLinkInvalid
+            ? 'Stripe payments are enabled, but the configured payment link is invalid. Fix VITE_STRIPE_PAYMENT_LINK before marking.'
+            : 'Subscription required. Enter the subscriber email, complete checkout, and wait for an active (paid) record before marking.'
           window.scrollTo(0, 0)
           setError(subscriptionRequiredMessage)
         }
@@ -715,7 +753,7 @@ export default function App() {
       }
 
       if (hasPendingPaymentAccess && mountedRef.current) {
-        setSubscriptionResult(`Pending Stripe payment detected for this email. ${PENDING_PAYMENT_ACCESS_NOTE}`)
+        setSubscriptionResult(`Pending (billing in progress) payment detected for this email. ${PENDING_PAYMENT_ACCESS_NOTE}`)
       }
 
       const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
@@ -933,7 +971,7 @@ export default function App() {
             <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
             <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
             <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
-            <div className="stat"><span>Paywall</span><strong>{STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'On' : 'Invalid') : 'Demo'}</strong></div>
+            <div className="stat"><span>Paywall</span><strong>{stripePaymentLinkConfigured ? (hasStripePaymentLink ? 'Enabled' : 'Misconfigured') : 'Demo'}</strong></div>
           </div>
         </div>
       </header>
@@ -992,7 +1030,7 @@ export default function App() {
 
           <div className={`dropzone ${ocrLoading ? 'loading' : ''}`}>
             <input
-              ref={uploadInputRef}
+              id="upload"
               className="visually-hidden"
               type="file"
               accept="image/*"
@@ -1002,17 +1040,27 @@ export default function App() {
                 e.target.value = ''
               }}
             />
-            <button
-              type="button"
+            <label
+              htmlFor="upload"
               className="upload-button"
-              onClick={() => uploadInputRef.current?.click()}
-              disabled={ocrLoading}
+              role="button"
+              tabIndex={ocrLoading ? -1 : 0}
+              aria-disabled={ocrLoading}
               aria-label="Upload a scan or photo of the question"
               aria-describedby="ocr-status"
+              onKeyDown={(e) => {
+                if (ocrLoading) {
+                  return
+                }
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  document.getElementById('upload')?.click()
+                }
+              }}
             >
               <strong>Upload a scan or photo of the question</strong>
               <span>JPG, PNG, or camera image</span>
-            </button>
+            </label>
             {uploadName ? <p className="file-name">Selected: {uploadName}</p> : <p className="file-name">No file selected yet.</p>}
             <div className="ocr-status-row">
               <p id="ocr-status" className="muted ocr-status-text" aria-live="polite">
@@ -1232,7 +1280,7 @@ export default function App() {
                   <span>{subscriptionPlans.find((p) => p.id === subscription?.plan)?.label ?? subscription?.plan}</span>
                 </div>
                 <div>
-                  <strong>{subscription?.status ?? 'Unknown status'}</strong>
+                  <strong>{getSubscriptionStatusLabel(subscription?.status)}</strong>
                   <span>{formatDateTime(subscription?.created_at)}</span>
                 </div>
               </article>

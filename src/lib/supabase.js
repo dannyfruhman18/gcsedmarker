@@ -5,6 +5,8 @@ import {
   SUPABASE_CONFIG_ERROR,
 } from './constants'
 
+const PENDING_SUBSCRIPTION_STATUSES = new Set(['pending_payment'])
+
 function getSupabaseRequestConfigError() {
   if (SUPABASE_CONFIG_ERROR) {
     return SUPABASE_CONFIG_ERROR
@@ -91,11 +93,22 @@ export function isActiveSubscriptionRow(row) {
   return ACTIVE_SUBSCRIPTION_STATUSES.has(String(row?.status || '').trim().toLowerCase())
 }
 
+export function isPendingSubscriptionRow(row) {
+  return PENDING_SUBSCRIPTION_STATUSES.has(String(row?.status || '').trim().toLowerCase())
+}
+
 export function subscriptionHasActiveAccess(rows, email) {
   const normalizedEmail = normalizeEmail(email)
   if (!normalizedEmail || !Array.isArray(rows)) return false
 
   return rows.some((row) => normalizeEmail(row?.email) === normalizedEmail && isActiveSubscriptionRow(row))
+}
+
+export function subscriptionHasPendingAccess(rows, email) {
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail || !Array.isArray(rows)) return false
+
+  return rows.some((row) => normalizeEmail(row?.email) === normalizedEmail && isPendingSubscriptionRow(row))
 }
 
 export function formatDateTime(value) {

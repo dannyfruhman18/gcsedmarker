@@ -132,6 +132,9 @@ const PROMPT_FAMILY_FEEDBACK_TERMS = {
   calculate: 'calculation',
 }
 
+const HEURISTIC_METHOD_MARK_NOTE =
+  'Heuristic note: these method-mark signals suggest possible credit, but a human marker would still need to confirm the final award.'
+
 function getPromptFamilyFeedbackTerm(promptFamily) {
   if (!promptFamily) {
     return ''
@@ -204,24 +207,24 @@ function getBoardSpecificFeedback(board, mode) {
   switch (board) {
     case 'AQA':
       return mode === 'essay'
-        ? 'AQA focus on AO2 structure: keep each paragraph tightly linked to the question.'
-        : 'AQA focus on method: show each calculation step clearly and label your working.'
+        ? 'AQA responses often benefit from AO2 structure: keep each paragraph tightly linked to the question.'
+        : 'AQA responses often benefit from showing each calculation step clearly and labelling working.'
     case 'Edexcel':
       return mode === 'essay'
-        ? 'Edexcel evaluation requirement: make your judgement explicit and supported by evidence.'
-        : 'Edexcel focus on method marks: keep substitutions and calculations easy to follow.'
+        ? 'Edexcel responses often benefit from making the judgement explicit and supported by evidence.'
+        : 'Edexcel responses often benefit from keeping substitutions and calculations easy to follow.'
     case 'OCR':
       return mode === 'essay'
-        ? 'OCR focus: balance evidence, explanation, and judgement across your response.'
-        : 'OCR focus on accuracy: show the working trail and include the final conclusion clearly.'
+        ? 'OCR responses often benefit from balancing evidence, explanation, and judgement across the response.'
+        : 'OCR responses often benefit from a clear working trail and an explicit final conclusion.'
     case 'WJEC':
       return mode === 'essay'
-        ? 'Ensure your points specifically address the WJEC assessment objectives for your subject.'
-        : 'WJEC math/science marking values clear step-by-step methodology.'
+        ? 'WJEC responses often benefit from points that clearly address the assessment objectives for the subject.'
+        : 'WJEC maths/science marking often benefits from clear step-by-step methodology.'
     case 'CCEA':
       return mode === 'essay'
-        ? 'CCEA structure: clearly signpost your assessment objectives (AO1/AO2/AO3) within your answer.'
-        : 'CCEA method marks: show your working clearly and ensure your final answer stands out.'
+        ? 'CCEA responses often benefit from clearly signposted AO1/AO2/AO3 within the answer.'
+        : 'CCEA method-mark responses often benefit from clearly shown working and a visible final answer.'
     default:
       return 'Keep your response aligned to the question and show your reasoning clearly.'
   }
@@ -241,8 +244,8 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
     return {
       maxMarks: 6,
       score: 0,
-      ao1: ['You are ready to start — paste a student response and we will help shape it into stronger AO1 evidence.'],
-      ao2: ['Even a short answer is enough to begin; adding more detail will unlock clearer AO2 feedback.'],
+      ao1: ['You are ready to start — paste a student response and we can help shape it into stronger AO1 evidence.'],
+      ao2: ['Even a short answer is enough to begin; adding more detail should make the AO2 feedback clearer.'],
       ao3: ['Once the response is pasted in, we can point out where judgement and evaluation can be strengthened.'],
       summary: topBand
         ? 'Top Band mode works best once an essay response is pasted in.'
@@ -270,20 +273,20 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   const hasStructure = paragraphBreaks >= 1
 
   if (hasAdequateLength) {
-    ao1.push('There is enough detail here to assess the main ideas.')
+    ao1.push('The response length suggests sufficient detail for an assessment.')
   } else if (length > 0) {
-    pushUniqueFeedback(ao1, 'Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
+    pushUniqueFeedback(ao1, 'Add more specific facts, quotes, examples, or terminology to improve the chance of AO1 credit.')
   }
 
   if (hasEvidenceDetail) {
-    ao1.push('You are using specific evidence, examples, or terminology, which strengthens AO1.')
+    ao1.push('The response appears to use specific evidence, examples, or terminology, which may strengthen AO1.')
     score += 1
   } else {
-    pushUniqueFeedback(ao1, 'Add more specific facts, quotes, examples, or terminology to secure AO1 marks.')
+    pushUniqueFeedback(ao1, 'Add more specific facts, quotes, examples, or terminology to improve the chance of AO1 credit.')
   }
 
   if (hasReasoning) {
-    ao2.push('You are explaining ideas and linking evidence to your point, which supports AO2.')
+    ao2.push('The response appears to explain ideas and link evidence to a point, which may support AO2.')
     score += 1
   } else {
     ao2.push('Develop analysis by explaining how and why the evidence matters.')
@@ -315,7 +318,7 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   }
 
   if (hasEvaluation) {
-    ao3.push('There is some evaluation or judgement, which helps the top bands.')
+    ao3.push('The response appears to include some evaluation or judgement, which may help top-band criteria.')
     score += 1
   } else {
     ao3.push('Add a clear judgement or comparison to reach stronger AO3 levels.')
@@ -332,14 +335,14 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
     } else {
       ao3.push(
         questionAnalysis.promptFamilyFeedbackTerm
-          ? `The question calls for more ${questionAnalysis.promptFamilyFeedbackTerm}, so add more of the matching style (reasoning, comparison, or evaluation).`
+          ? `The question appears to call for more ${questionAnalysis.promptFamilyFeedbackTerm}, so add more of the matching style (reasoning, comparison, or evaluation).`
           : `The question asks you to ${questionAnalysis.commandWord}, so add more of the matching style (reasoning, comparison, or evaluation).`,
       )
     }
   }
 
   if (hasStructure) {
-    ao3.push('Good paragraph structure identified.')
+    ao3.push('Paragraph breaks suggest some structure.')
     score += 1
   } else {
     ao3.push('Consider using paragraph breaks to improve the structure of your essay.')
@@ -349,16 +352,16 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
     if (topBand) {
       score += 1
     }
-    ao3.push('Sustained development across the response helps to secure the top band.')
+    ao3.push('Sustained development across the response may support top-band performance.')
     if (topBand) {
-      ao3.push('Top Band mode: add a sharp final judgement, embed precise terminology, and make every paragraph move the argument forward.')
-      ao2.push('Top Band mode: use linked chains of reasoning and compare alternatives instead of listing points.')
-      ao3.push('Top Band mode: refine paragraph sequencing, counterargument, and conclusion flow to maximise impact.')
+      ao3.push('Top Band mode: consider adding a sharp final judgement, embedding precise terminology, and making every paragraph move the argument forward.')
+      ao2.push('Top Band mode: consider using linked chains of reasoning and comparison instead of listing points.')
+      ao3.push('Top Band mode: consider refining paragraph sequencing, counterargument, and conclusion flow to maximise impact.')
     }
   } else if (hasAdequateLength) {
-    ao3.push('Your answer has enough detail to assess, but it needs more sustained development to reach the top band.')
+    ao3.push('The response has enough detail to assess, but it may need more sustained development to reach the top band.')
   } else if (topBand) {
-    ao3.push('Top Band feedback unlocks best when the essay is more fully developed (around 120 words or more).')
+    ao3.push('Top Band feedback works best when the essay is more fully developed (around 120 words or more).')
   }
 
   return {
@@ -369,9 +372,9 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
     ao3,
     summary: topBand
       ? hasSustainedDevelopment
-        ? 'Grade 9 / Top Band focus: make every paragraph precise, conceptual, and evaluative.'
+        ? 'Grade 9 / Top Band focus: aim for precise, conceptual, and evaluative paragraphs.'
         : hasAdequateLength
-          ? 'Top Band mode is on, but this response needs more sustained development (120+ words) before full top-band feedback applies.'
+          ? 'Top Band mode is on, but this response would benefit from more sustained development (120+ words) before full top-band feedback applies.'
           : 'Top Band mode is on, but this response is still too brief for full top-band feedback.'
       : questionAnalysis.questionKeywords.length
         ? 'Focus on specific knowledge, explanation, and staying aligned to the question.'
@@ -392,12 +395,12 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
     return {
       maxMarks: 9,
       score: 0,
-      ao1: ['You are ready to begin — paste the working or final answer and we will help identify the method marks.'],
-      ao2: ['A few steps are enough to start; adding them will make the process feedback more precise.'],
-      ao3: ['Once the answer is in, we can point out the units, scientific idea, or conclusion that will strengthen the response.'],
+      ao1: ['Heuristic method-mark checks suggest possible credit for the steps, working, and structure you show.'],
+      ao2: ['Explaining each step clearly can help the marker follow the method trail.'],
+      ao3: ['If this is a science question, including the key scientific idea, correct units, and any required conclusion can strengthen the response.'],
       summary: topBand
         ? 'Top Band mode works best once a maths/science response is pasted in.'
-        : 'Paste working or an answer and we will give you encouraging method-mark feedback.',
+        : 'Method-mark feedback uses heuristic checks for visible working and correct process; a human marker would still need to confirm any award.',
       extra: [],
     }
   }
@@ -409,6 +412,8 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
       methodMarks.push(message)
     }
   }
+
+  addMethodMark(HEURISTIC_METHOD_MARK_NOTE)
 
   let score = 0
   const hasVisibleCalculation = /(?:\b(?:\d+(?:\.\d+)?[a-z]?|[a-z])\s*=\s*(?:\d+(?:\.\d+)?[a-z]?|[a-z])\b|\b[a-z0-9]+(?:\s*[+\-×÷^\/]\s*[a-z0-9]+)+\b|=>|→)/i.test(text)
@@ -427,37 +432,37 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
 
   if (hasWorkingTrail) {
     score += 2
-    addMethodMark('You show more than one line of working, which is good evidence for method marks.')
+    addMethodMark('The working suggests more than one step, which may support method-mark credit.')
   } else if (hasMethodTrace) {
     score += 1
-    addMethodMark('Show the steps you used, not just the final answer.')
+    addMethodMark('Showing the steps you used may help support method-mark credit.')
   } else if (hasFormulaReference) {
     score += 1
-    addMethodMark('You reference formulas, equations, or a calculation path, which helps show method.')
+    addMethodMark('The formula or calculation path you reference may support method-mark credit.')
   } else {
-    addMethodMark('Use equations, substitutions, or calculation steps to earn method marks.')
+    addMethodMark('Use equations, substitutions, or calculation steps to improve the chance of method-mark credit.')
   }
 
   if (hasUnits) {
     score += 1
-    addMethodMark('You have included units or scientific measurement language.')
+    addMethodMark('The units or measurement language suggest the response is on the right track.')
   } else {
     addMethodMark('Include units where needed and keep the final answer contextualised.')
   }
 
   if (hasConclusion) {
     score += 1
-    addMethodMark('Detected markers for a conclusion or final answer, which is key for top marks.')
+    addMethodMark('The response appears to include a conclusion or final answer, which may help the top marks.')
   }
 
   if (hasConceptualDetail) {
     score += 1
-    addMethodMark('You include topic vocabulary or scientific context, which helps demonstrate understanding.')
+    addMethodMark('The topic vocabulary suggests understanding of the topic, which may support credit.')
   }
 
   if (hasVerification) {
     score += 1
-    addMethodMark('You check or verify the result, which strengthens the method trail.')
+    addMethodMark('The checking language suggests verification, which may strengthen the method trail.')
   }
 
   if (hasPromptFocus) {
@@ -465,26 +470,26 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
     const matchedSnippet = questionAnalysis.matchedKeywords.slice(0, 3).join(', ')
     addMethodMark(
       matchedSnippet
-        ? `Question-aware check: you reuse key terms such as ${matchedSnippet}, which keeps the working on task.`
-        : 'Question-aware check: you reuse key terms from the prompt, which keeps the working on task.',
+        ? `Question-aware heuristic: reusing key terms such as ${matchedSnippet} suggests the working stays on task.`
+        : 'Question-aware heuristic: reusing key terms from the prompt suggests the working stays on task.',
     )
   } else if (questionAnalysis.questionKeywords.length) {
     const missingSnippet = questionAnalysis.missingKeywords.slice(0, 3).join(', ')
     addMethodMark(
       missingSnippet
-        ? `Question-aware check: use more of the prompt wording such as ${missingSnippet} so the method stays focused.`
-        : 'Question-aware check: use more of the prompt wording so the method stays focused.',
+        ? `Question-aware heuristic: use more of the prompt wording such as ${missingSnippet} so the method stays focused.`
+        : 'Question-aware heuristic: use more of the prompt wording so the method stays focused.',
     )
   }
 
   if (hasSustainedReasoning) {
     score += 1
-    addMethodMark('Your response is long enough to show a fuller chain of reasoning.')
+    addMethodMark('The response is long enough to suggest a fuller chain of reasoning.')
     if (topBand) {
-      addMethodMark('Top Band mode: show a full chain of reasoning, label substitutions, and check the answer against sensible values.')
+      addMethodMark('Top Band mode: consider showing a full chain of reasoning, labelling substitutions, and checking the answer against sensible values.')
     }
   } else if (topBand) {
-    addMethodMark('Top Band feedback unlocks best when the answer is more fully developed (over 100 words).')
+    addMethodMark('Top Band feedback works best when the answer is more fully developed (over 100 words).')
   }
 
   if (questionAnalysis.commandWord) {
@@ -492,13 +497,13 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
       score += 1
       addMethodMark(
         questionAnalysis.promptFamilyFeedbackTerm
-          ? `The prompt calls for ${questionAnalysis.promptFamilyFeedbackTerm}, and your response shows that process clearly.`
+          ? `The prompt appears to ask for more ${questionAnalysis.promptFamilyFeedbackTerm}, and your response shows that process clearly.`
           : `The prompt asks you to ${questionAnalysis.commandWord}, and your response shows that process clearly.`,
       )
     } else {
       addMethodMark(
         questionAnalysis.promptFamilyFeedbackTerm
-          ? `The prompt calls for more ${questionAnalysis.promptFamilyFeedbackTerm}, so make that method style more obvious in your working.`
+          ? `The prompt appears to ask for more ${questionAnalysis.promptFamilyFeedbackTerm}, so make that method style more obvious in your working.`
           : `The prompt asks you to ${questionAnalysis.commandWord}, so make that method style more obvious in your working.`,
       )
     }
@@ -512,14 +517,14 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   return {
     maxMarks: 9,
     score: Math.min(score, 9),
-    ao1: ['Method marks are awarded for the steps, working, and correct structure you show.'],
-    ao2: ['Explain each step clearly, especially when moving from formula to substitution to answer.'],
-    ao3: ['If this is a science question, include the key scientific idea, correct units, and any required conclusion.'],
+    ao1: ['Heuristic method-mark checks suggest possible credit for the steps, working, and structure you show; a marker would still confirm the award.'],
+    ao2: ['Explaining each step clearly can help the marker follow the method trail.'],
+    ao3: ['If this is a science question, including the key scientific idea, correct units, and any required conclusion can strengthen the response.'],
     summary: topBand
       ? 'Top Band mode: maximise the working trail and annotate every step.'
       : questionAnalysis.questionKeywords.length
-        ? 'Method marks focus on visible working, correct process, and staying aligned to the question.'
-        : 'Method marks focus on visible working and correct process.',
+        ? 'Method-mark feedback uses heuristic checks for visible working and correct process, so a human marker would still need to confirm any award.'
+        : 'Method-mark feedback uses heuristic checks for visible working and correct process, so a human marker would still need to confirm any award.',
     extra: methodMarks,
   }
 }
