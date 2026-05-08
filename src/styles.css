@@ -365,6 +365,8 @@ textarea {
 
 .ocr-status-actions > button {
   margin-top: 0;
+  flex: 1 1 auto;
+  min-width: 100px;
 }
 
 .preview-container {
@@ -741,7 +743,8 @@ textarea {
   }
 
   .ocr-status-actions > button {
-    flex: 1 1 calc(50% - 5px);
+    flex: 1 1 auto;
+    width: auto;
   }
 }
 
