@@ -403,7 +403,6 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
     }
   }
 
-  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean)
   const methodMarks = []
   const addMethodMark = (message) => {
     if (message && !methodMarks.includes(message)) {
@@ -416,7 +415,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   let score = 0
   const hasVisibleCalculation = /(?:\b(?:\d+(?:\.\d+)?[a-z]?|[a-z])\s*=\s*(?:\d+(?:\.\d+)?[a-z]?|[a-z])\b|\b[a-z0-9]+(?:\s*[+\-×÷^\/]\s*[a-z0-9]+)+\b|=>|→)/i.test(text)
   const hasProcessLanguage = /\b(?:substitut(?:e|ion)|calculate|show\s+(?:your\s+work|the\s+working|working(?:\s+out)?)|working(?:\s+out)?|step(?:s)?|solve|method|equation|formula|check|verify|verified|recheck|recalculate|units)\b|→|=>/i.test(text)
-  const hasWorkingTrail = hasVisibleCalculation || hasProcessLanguage
+  const hasWorkingTrail = hasVisibleCalculation && hasProcessLanguage
   const hasMethodTrace = hasVisibleCalculation || hasProcessLanguage
   const hasFormulaReference = /\b(formula|equation|substitut(?:e|ion)|calculation|ratio|proportion|graph|table|method)\b/i.test(text)
   const hasUnits = /\b(?:cm|mm|kg|g|mol|dm\^?3|°c|units)\b|(?:\d+\s*(?:m|s|n|j|w)\b)/i.test(text)
@@ -426,7 +425,7 @@ export function scoreMathsScience(options = {}, legacyTopBand, legacyBoard = 'AQ
   const hasPromptFocus = questionAnalysis.questionKeywords.length
     ? questionAnalysis.matchedKeywords.length >= 2 || questionAnalysis.keywordCoverage >= 0.35
     : false
-  const hasSustainedReasoning = text.length >= 100
+  const hasSustainedReasoning = text.split(/\s+/).filter(Boolean).length >= 100
 
   if (hasWorkingTrail) {
     score += 2
