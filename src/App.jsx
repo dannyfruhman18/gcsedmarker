@@ -204,7 +204,8 @@ export default function App() {
   const scoringContextVersionRef = useRef(0)
   const questionTextAutoFilledRef = useRef(false)
 
-  const boardLink = useMemo(() => BOARD_LINKS[board] ?? BOARD_LINKS.AQA, [board])
+  const selectedBoard = useMemo(() => (boardOptions.includes(board) ? board : 'AQA'), [board])
+  const boardLink = useMemo(() => BOARD_LINKS[selectedBoard] ?? BOARD_LINKS.AQA, [selectedBoard])
   const normalizedSubscriptionEmail = useMemo(
     () => normalizeEmail(subscriptionEmail),
     [subscriptionEmail],
@@ -803,7 +804,7 @@ export default function App() {
         questionText: trimmedQuestion,
         answerText: trimmedAnswer,
         topBand,
-        board,
+        board: selectedBoard,
       })
       if (!mountedRef.current || scoringContextVersionRef.current !== scoringContextVersionAtStart) return
       setMarkResult(result)
@@ -813,7 +814,7 @@ export default function App() {
         headers: { Prefer: 'return=representation' },
         body: [
           {
-            exam_board: board,
+            exam_board: selectedBoard,
             mode,
             question_text: trimmedQuestion,
             answer_text: trimmedAnswer,
@@ -1010,7 +1011,7 @@ export default function App() {
         </div>
         <div className="hero-card">
           <div className="stat-row">
-            <div className="stat"><span>Exam board</span><strong>{board}</strong></div>
+            <div className="stat"><span>Exam board</span><strong>{selectedBoard}</strong></div>
             <div className="stat"><span>Mode</span><strong>{modeOptions.find((item) => item.id === mode)?.label}</strong></div>
             <div className="stat"><span>Top Band</span><strong>{topBand ? 'On' : 'Off'}</strong></div>
             <div className="stat"><span>Paywall</span><strong>{stripePaymentLinkConfigured ? (hasStripePaymentLink ? 'Enabled' : 'Misconfigured') : 'Demo'}</strong></div>
@@ -1250,8 +1251,21 @@ export default function App() {
               </select>
             </label>
             <p className="muted">{subscriptionPlans.find((plan) => plan.id === subscriptionPlan)?.access}</p>
-            <button className="primary" onClick={handleSubscription} disabled={submittingSubscription}>
-              {submittingSubscription ? 'Processing...' : STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'Open Stripe checkout' : 'Checkout config invalid') : 'Create subscription record'}
+            <button
+              className="primary"
+              onClick={handleSubscription}
+              disabled={submittingSubscription || supabaseConfigError}
+              title={
+                supabaseConfigError
+                  ? 'Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable subscription checkout.'
+                  : undefined
+              }
+            >
+              {supabaseConfigError
+                ? 'Configure Supabase first'
+                : submittingSubscription
+                  ? 'Processing...'
+                  : STRIPE_PAYMENT_LINK ? (hasStripePaymentLink ? 'Open Stripe checkout' : 'Checkout config invalid') : 'Create subscription record'}
             </button>
             <button className="secondary" onClick={() => void refreshSubscriptionStatus()} disabled={refreshingSubscriptionStatus || Boolean(supabaseConfigMessage)}>
               {refreshingSubscriptionStatus ? 'Refreshing...' : 'Refresh Status'}
