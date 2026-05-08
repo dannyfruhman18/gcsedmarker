@@ -40,6 +40,7 @@ html, body, #root { min-height: 100dvh; }
 body {
   margin: 0;
   min-height: 100dvh;
+  font-family: 'Inter', sans-serif;
   background: linear-gradient(180deg, var(--color-page-gradient-start) 0%, var(--color-page-gradient-end) 100%);
 }
 
@@ -414,7 +415,7 @@ textarea {
   cursor: pointer;
   transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
   margin-top: 4px;
-  margin-left: auto;
+  margin-left: 0;
   touch-action: manipulation;
 }
 
@@ -695,11 +696,25 @@ textarea {
   .history-item {
     flex-direction: column;
   }
+
+  #ocr-status {
+    flex: 1 1 100% !important;
+    min-width: 0;
+  }
+
+  #ocr-status ~ button {
+    flex: 1 1 calc(50% - 5px);
+    margin-left: 0 !important;
+  }
 }
 
 @media (max-width: 640px) {
   .stat-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  #ocr-status ~ button {
+    flex-basis: 100%;
   }
 }
 
