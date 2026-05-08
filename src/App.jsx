@@ -13,6 +13,7 @@ import {
   subscriptionPlans,
 } from './lib/constants'
 import { scoreEssay, scoreMathsScience } from './lib/scoring'
+import ProofVideoSection from './components/ProofVideoSection'
 import {
   formatDateTime,
   maskEmail,
@@ -871,6 +872,8 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      <ProofVideoSection />
 
       {supabaseConfigMessage ? (
         <section className="panel" role="alert" aria-live="assertive">
