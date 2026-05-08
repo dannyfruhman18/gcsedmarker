@@ -6,6 +6,7 @@ import {
   EMAIL_ADDRESS_REGEX,
   MAX_UPLOAD_SIZE_BYTES,
   MAX_VISIBLE_HISTORY_ROWS,
+  MAX_VISIBLE_SUBSCRIPTION_ROWS,
   STRIPE_PAYMENT_LINK,
   SUPABASE_CONFIG_ERROR,
   boardOptions,
@@ -278,7 +279,7 @@ export default function App() {
     const normalizedEmail = normalizeEmail(email)
     const subscriptionsPath = normalizedEmail
       ? `/rest/v1/subscriptions?select=*&order=created_at.desc&limit=200&email=eq.${encodeURIComponent(normalizedEmail)}`
-      : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=5'
+      : '/rest/v1/subscriptions?select=*&order=created_at.desc&limit=10'
 
     const controller = new AbortController()
     subscriptionsControllerRef.current = controller
@@ -1192,7 +1193,7 @@ export default function App() {
         </div>
         <div className="history-list">
           {recentSubscriptions.length ? (
-            recentSubscriptions.slice(0, MAX_VISIBLE_HISTORY_ROWS).map((subscription, index) => (
+            recentSubscriptions.slice(0, MAX_VISIBLE_SUBSCRIPTION_ROWS).map((subscription, index) => (
               <article key={subscription?.id ?? `subscription-${index}`} className="history-item">
                 <div>
                   <strong>{maskEmail(subscription?.email)}</strong>
