@@ -10,13 +10,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Show environment details
+        run: |
+          echo "Runner: $RUNNER_OS"
+          node -v
+          npm -v
+          pwd
+          ls -la
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
-      - run: npm run build
+
+      - name: Install dependencies with verbose logging
+        run: npm install --verbose
+
+      - name: Build web app with verbose logging
+        run: npm run build -- --debug
+
       # Removed `npm run cap:sync` because this repo does not include committed native folders
       # (for example `ios/` or `android/`), so that step would fail in CI.
+      - name: Inspect build output
+        run: |
+          echo "Dist contents:"
+          find dist -maxdepth 2 -type f | sort || true
+          du -sh dist || true
+
       - uses: actions/upload-artifact@v4
         with:
           name: gcsedmarker-web-build
