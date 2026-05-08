@@ -46,11 +46,17 @@ create policy public_insert_marking_sessions
   to anon, authenticated
   with check (true);
 
+-- SECURITY NOTE:
+-- This is stricter than the original demo policy because it no longer exposes
+-- pending_payment rows to anonymous clients. It still allows anon reads of
+-- active/trialing subscription records, so production should move entitlement
+-- checks to authenticated users or a server-side/service-role function.
+drop policy if exists public_select_subscriptions on public.subscriptions;
 create policy public_select_subscriptions
   on public.subscriptions
   for select
   to anon, authenticated
-  using (true);
+  using (status in ('active', 'trialing'));
 
 create policy public_insert_subscriptions
   on public.subscriptions
