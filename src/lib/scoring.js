@@ -324,7 +324,7 @@ export function scoreEssay(options = {}, legacyTopBand, legacyBoard = 'AQA') {
   }
 
   if (hasSustainedDevelopment) {
-    if (topBand && essayLength > 150) {
+    if (topBand && hasSustainedDevelopment) {
       score += 1
     }
     ao3.push('Sustained development across the response helps to secure the top band.')
