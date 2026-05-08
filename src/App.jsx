@@ -167,6 +167,7 @@ export default function App() {
   const [sessionsError, setSessionsError] = useState(null)
   const [subscriptionsError, setSubscriptionsError] = useState(null)
   const [ocrRetryAvailable, setOcrRetryAvailable] = useState(false)
+  const [isOcrRetrying, setIsOcrRetrying] = useState(false)
 
   const uploadRequestIdRef = useRef(0)
   const sessionsRequestIdRef = useRef(0)
@@ -650,9 +651,21 @@ export default function App() {
     }
 
     setError(null)
+    setIsOcrRetrying(true)
     setOcrRetryAvailable(false)
     setOcrStatus('Retrying OCR...')
-    await handleFileChange(file)
+
+    try {
+      await handleFileChange(file)
+    } catch (err) {
+      console.error('OCR retry failed:', err)
+      const errorMessage = `OCR retry failed: ${err?.message || String(err)}`
+      setError(errorMessage)
+      setOcrRetryAvailable(true)
+      setOcrStatus(errorMessage)
+    } finally {
+      setIsOcrRetrying(false)
+    }
   }
 
   async function handleMark() {
@@ -1072,6 +1085,7 @@ export default function App() {
                     type="button"
                     className="secondary"
                     onClick={() => void handleOcrRetry()}
+                    disabled={ocrLoading || isOcrRetrying}
                   >
                     Retry OCR
                   </button>
