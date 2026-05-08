@@ -23,7 +23,9 @@ class ErrorBoundaryController extends React.Component {
 
   handleRetry = () => {
     this.props.onReset?.()
-    window.location.reload()
+    // Reset the boundary state so the app can remount without a full page reload.
+    // If the same render error persists, React will catch it again and show the fallback.
+    this.setState({ error: null, hasError: false })
   }
 
   renderFallback(error) {
