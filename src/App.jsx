@@ -19,7 +19,6 @@ import {
   formatDateTime,
   maskEmail,
   normalizeEmail,
-  subscriptionHasActiveAccess,
   supabaseRequest,
 } from './lib/supabase'
 
@@ -92,6 +91,26 @@ function getStripeCheckoutFallbackMessage(detail) {
   }
 
   return `Stripe checkout could not be opened because ${value}. The subscription was saved in Supabase, and you can use the fallback link below to continue payment.`
+}
+
+const PENDING_PAYMENT_ACCESS_NOTE = 'Demo access is enabled while Stripe is not fully integrated.'
+
+function getSubscriptionAccessDetails(rows, email) {
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail || !Array.isArray(rows)) {
+    return {
+      hasActiveSubscription: false,
+      hasPendingPayment: false,
+    }
+  }
+
+  const matchingRows = rows.filter((row) => normalizeEmail(row?.email) === normalizedEmail)
+  const statuses = matchingRows.map((row) => String(row?.status ?? '').trim().toLowerCase())
+
+  return {
+    hasActiveSubscription: statuses.some((status) => status === 'active' || status === 'trialing'),
+    hasPendingPayment: statuses.some((status) => status === 'pending_payment'),
+  }
 }
 
 export default function App() {
@@ -362,12 +381,16 @@ export default function App() {
       if (rows === null) {
         setSubscriptionResult('Failed to refresh status.')
       } else {
-        const hasActiveSubscription = subscriptionHasActiveAccess(rows, email)
-        setSubscriptionResult(
-          hasActiveSubscription
-            ? 'An active subscription was found for this email.'
-            : 'No active subscription was found for this email.',
-        )
+        const subscriptionAccessDetails = getSubscriptionAccessDetails(rows, email)
+        if (subscriptionAccessDetails.hasActiveSubscription) {
+          setSubscriptionResult('An active subscription was found for this email.')
+        } else if (subscriptionAccessDetails.hasPendingPayment) {
+          setSubscriptionResult(
+            `A pending Stripe payment was found for this email. ${PENDING_PAYMENT_ACCESS_NOTE}`,
+          )
+        } else {
+          setSubscriptionResult('No active subscription was found for this email.')
+        }
       }
     } finally {
       if (mountedRef.current) {
@@ -399,7 +422,11 @@ export default function App() {
     uploadRequestIdRef.current += 1
     revokeUploadPreview()
     pendingOcrFileRef.current = null
+    ocrProgressHandlerRef.current = null
     setOcrRetryAvailable(false)
+    questionTextAutoFilledRef.current = false
+    questionTextVersionRef.current = 0
+    setQuestionText('')
     setUploadName('')
     setUploadPreview('')
     resetMarkingContext()
@@ -665,9 +692,16 @@ export default function App() {
         return
       }
 
+      const subscriptionAccessDetails = hasSubscriptionEmail
+        ? getSubscriptionAccessDetails(refreshedSubscriptions, normalizedMarkEmail)
+        : { hasActiveSubscription: true, hasPendingPayment: false }
       const hasActiveSubscription = !hasSubscriptionEmail
         ? true
-        : subscriptionHasActiveAccess(refreshedSubscriptions, normalizedMarkEmail)
+        : subscriptionAccessDetails.hasActiveSubscription || subscriptionAccessDetails.hasPendingPayment
+      const hasPendingPaymentAccess =
+        hasSubscriptionEmail &&
+        subscriptionAccessDetails.hasPendingPayment &&
+        !subscriptionAccessDetails.hasActiveSubscription
 
       if (hasStripePaymentLink && hasSubscriptionEmail && !hasActiveSubscription) {
         if (mountedRef.current && scoringContextVersionRef.current === scoringContextVersionAtStart) {
@@ -676,6 +710,10 @@ export default function App() {
           setError(subscriptionRequiredMessage)
         }
         return
+      }
+
+      if (hasPendingPaymentAccess && mountedRef.current) {
+        setSubscriptionResult(`Pending Stripe payment detected for this email. ${PENDING_PAYMENT_ACCESS_NOTE}`)
       }
 
       const analyzer = mode === 'essay' ? scoreEssay : scoreMathsScience
@@ -814,7 +852,7 @@ export default function App() {
         hasStripeCheckout
           ? stripeCheckoutIssue
             ? getStripeCheckoutFallbackMessage(stripeCheckoutIssue)
-            : 'Subscription record saved in Supabase and Stripe checkout opened in a new tab.'
+            : `Subscription record saved in Supabase and Stripe checkout opened in a new tab. ${PENDING_PAYMENT_ACCESS_NOTE}`
           : 'Subscription record saved in Supabase. Add a Stripe payment link to turn this into live checkout.',
       )
     } catch (err) {
